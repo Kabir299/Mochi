@@ -1,0 +1,18 @@
+# One-click deploy on Render (render.com, free tier): New → Blueprint → pick this repo.
+# Fill in the keys in the Render dashboard; they are never stored in the repo.
+services:
+  - type: web
+    name: habit-tracker-ai
+    runtime: docker
+    rootDir: server
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: APP_KEY
+        generateValue: true
+      - key: RATE_LIMIT
+        value: "40"
