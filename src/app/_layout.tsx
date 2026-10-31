@@ -3,6 +3,8 @@ import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AppLock } from '@/components/AppLock';
+import { PurchasesSync } from '@/components/PurchasesSync';
 import { ReminderSync } from '@/components/ReminderSync';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/lib/db';
 import { HabitsProvider } from '@/state/habits';
@@ -19,6 +21,7 @@ export default function RootLayout() {
             <NutritionProvider>
               <StatusBar style="light" />
               <ReminderSync />
+              <PurchasesSync />
               <Stack
                 screenOptions={{
                   headerShown: false,
@@ -40,6 +43,7 @@ export default function RootLayout() {
                 <Stack.Screen name="pet" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="share-card" options={{ presentation: 'modal' }} />
               </Stack>
+              <AppLock />
             </NutritionProvider>
           </HabitsProvider>
         </SettingsProvider>

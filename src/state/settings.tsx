@@ -10,9 +10,10 @@ import {
 import { useSQLiteContext } from 'expo-sqlite';
 
 import * as db from '@/lib/db';
+import { paymentsEnabled } from '@/lib/purchases';
 
 export type Settings = {
-  // Unlocked locally for now; swap for a real in-app purchase check before release.
+  // Has an active Pro subscription (see lib/purchases.ts), or FREE_LAUNCH.
   isPro: boolean;
   waterGoalMl: number;
   calorieGoal: number;
@@ -36,6 +37,8 @@ export type Settings = {
   onboarded: boolean;
   // Answers from onboarding as JSON (see lib/profile.ts); '' if never answered.
   profile: string;
+  // Ask for fingerprint / Face ID / passcode when the app opens.
+  appLock: boolean;
 };
 
 const DEFAULTS: Settings = {
@@ -54,6 +57,7 @@ const DEFAULTS: Settings = {
   streakNudge: true,
   onboarded: false,
   profile: '',
+  appLock: false,
 };
 
 type SettingsContextValue = Settings & {
@@ -63,9 +67,8 @@ type SettingsContextValue = Settings & {
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
-// Store builds have no real purchases yet, so everything is unlocked there.
-// Set to false once RevenueCat purchases are wired up.
-export const FREE_LAUNCH = !__DEV__;
+// Store builds without RevenueCat keys have no way to pay, so everything is unlocked there.
+export const FREE_LAUNCH = !__DEV__ && !paymentsEnabled;
 
 function parse(raw: Record<string, string>): Settings {
   const num = (key: keyof Settings, fallback: number) => {
@@ -89,6 +92,7 @@ function parse(raw: Record<string, string>): Settings {
     weeklyRecap: raw.weeklyRecap !== undefined ? raw.weeklyRecap === '1' : DEFAULTS.weeklyRecap,
     streakNudge: raw.streakNudge !== undefined ? raw.streakNudge === '1' : DEFAULTS.streakNudge,
     onboarded: raw.onboarded === '1',
+    appLock: raw.appLock === '1',
     profile: raw.profile ?? '',
   };
 }

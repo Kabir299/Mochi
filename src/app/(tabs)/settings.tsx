@@ -1,5 +1,6 @@
 import { ReactNode, useState } from 'react';
 import {
+  Alert,
   Linking,
   Platform,
   Pressable,
@@ -16,9 +17,11 @@ import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PRIVACY_SHORT } from '@/components/PrivacyNote';
 import { Segmented } from '@/components/Segmented';
 import { confirmDestructive } from '@/lib/confirm';
 import * as db from '@/lib/db';
+import { lockSupported, lockUnavailableReason, unlock } from '@/lib/lock';
 import { remindersSupported, requestReminderPermission } from '@/lib/reminders';
 import { useHabits } from '@/state/habits';
 import { useNutrition } from '@/state/nutrition';
@@ -58,6 +61,18 @@ export default function SettingsScreen() {
       return;
     }
     await Share.share({ message: json, title: 'Habit tracker export' });
+  };
+
+  const toggleLock = async (on: boolean) => {
+    // Prove it works before turning it on, so nobody locks themselves out.
+    const problem = on ? await lockUnavailableReason() : null;
+    if (problem) {
+      Alert.alert('App lock', problem);
+      return;
+    }
+    if (await unlock(on ? 'Turn on app lock' : 'Turn off app lock')) {
+      settings.update({ appLock: on });
+    }
   };
 
   const resetAll = async () => {
@@ -165,6 +180,28 @@ export default function SettingsScreen() {
           )}
         </Section>
 
+        <Section title="Privacy & security">
+          <Text style={styles.privacy}>{PRIVACY_SHORT}</Text>
+          <Text style={styles.privacy}>
+            No accounts, ads or tracking. Mochi gives general wellness tips, not medical advice;
+            calorie and protein numbers are estimates.
+          </Text>
+          {lockSupported && (
+            <ToggleRow
+              label="App lock (fingerprint, face or PIN)"
+              value={settings.appLock}
+              onChange={toggleLock}
+            />
+          )}
+          {PRIVACY_URL && (
+            <LinkRow
+              icon="shield-checkmark-outline"
+              label="Privacy policy"
+              onPress={() => Linking.openURL(PRIVACY_URL!)}
+            />
+          )}
+        </Section>
+
         <Section title="More">
           <LinkRow
             icon="compass-outline"
@@ -180,13 +217,6 @@ export default function SettingsScreen() {
             <LinkRow icon="diamond-outline" label="Pro" onPress={() => router.push('/pro')} />
           )}
           <LinkRow icon="share-outline" label="Export my data" onPress={exportData} />
-          {PRIVACY_URL && (
-            <LinkRow
-              icon="shield-checkmark-outline"
-              label="Privacy policy"
-              onPress={() => Linking.openURL(PRIVACY_URL!)}
-            />
-          )}
         </Section>
 
         <Section title="Archived habits">
@@ -332,6 +362,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.md,
   },
+  privacy: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
   label: {
     color: colors.textMuted,
     fontSize: 13,

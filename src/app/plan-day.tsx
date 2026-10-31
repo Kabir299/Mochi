@@ -5,6 +5,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ModalHeader } from '@/components/ModalHeader';
+import { PrivacyNote } from '@/components/PrivacyNote';
 import { ProLock } from '@/components/ProLock';
 import { DayPlan, minuteToTime, requestDayPlan, timeToMinute } from '@/lib/ai';
 import { formatDuration, formatMinute, fromDateKey, toDateKey } from '@/lib/dates';
@@ -81,11 +82,12 @@ export default function PlanDayScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ModalHeader title="Plan my day" />
+      <PrivacyNote />
       <ScrollView contentContainerStyle={styles.content}>
         {!isPro ? (
           <ProLock
             title="Let AI plan your day"
-            body="Claude fits your untimed tasks into free slots around the ones you’ve already scheduled."
+            body="Mochi fits your untimed tasks into free slots around the ones you’ve already scheduled."
           />
         ) : flexible.length === 0 ? (
           <View style={styles.card}>

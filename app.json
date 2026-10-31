@@ -45,6 +45,10 @@
       "@react-native-community/datetimepicker",
       "expo-sharing",
       [
+        "expo-local-authentication",
+        { "faceIDPermission": "Mochi uses Face ID to keep your habits private." }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",

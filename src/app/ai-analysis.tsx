@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ModalHeader } from '@/components/ModalHeader';
+import { PrivacyNote } from '@/components/PrivacyNote';
 import { ProLock } from '@/components/ProLock';
 import { Analysis, hasEnoughData, requestAnalysis } from '@/lib/ai';
 import { useHabits } from '@/state/habits';
@@ -38,11 +39,12 @@ export default function AiAnalysisScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ModalHeader title="AI analysis" />
+      <PrivacyNote />
       <ScrollView contentContainerStyle={styles.content}>
         {!settings.isPro ? (
           <ProLock
             title="Your personal habit coach"
-            body="Claude reads your last 30 days of habits, water and food, then tells you what's working, what's slipping and exactly what to try next."
+            body="Mochi reads your last 30 days of habits, water and food, then tells you what's working, what's slipping and exactly what to try next."
           />
         ) : !enoughData ? (
           <View style={styles.card}>
@@ -59,7 +61,7 @@ export default function AiAnalysisScreen() {
                 </View>
                 <Text style={styles.cardTitle}>Analyze your habits</Text>
                 <Text style={styles.body}>
-                  Claude reviews your completion rates, streaks and trends for the last 30 days
+                  Mochi reviews your completion rates, streaks and trends for the last 30 days
                   , plus your water and food logs and goals,{' '}
                   and suggests how to improve. Only summary numbers and habit names are sent.
                 </Text>
@@ -69,7 +71,7 @@ export default function AiAnalysisScreen() {
             {loading && (
               <View style={[styles.card, styles.center]}>
                 <ActivityIndicator color={colors.accent} />
-                <Text style={styles.body}>Claude is reviewing your last 30 days…</Text>
+                <Text style={styles.body}>Mochi is reviewing your last 30 days…</Text>
               </View>
             )}
 

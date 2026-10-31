@@ -11,6 +11,7 @@
 //   POST /brain-dump  free text              -> structured tasks
 //   POST /estimate-food  meal description    -> calories and protein
 //   POST /onboard-plan   first-launch answers -> a starting set of habits
+import { createHash, timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -29,6 +30,17 @@ const GEMINI_MODELS = [
   'gemini-3.6-flash',
   'gemini-3.5-flash-lite',
 ];
+// Logs never include what users sent or what the AI wrote back, only error codes and
+// field paths, so nothing personal is kept once a request finishes.
+function errorText(data: unknown) {
+  const error = (data as { error?: { message?: unknown } } | null)?.error;
+  return typeof error?.message === 'string' ? error.message.slice(0, 200) : '';
+}
+
+function issuePaths(error: z.ZodError) {
+  return error.issues.map((i) => i.path.join('.') || '(root)').join(', ');
+}
+
 const GEMINI_TIMEOUT_MS = 45_000;
 // Overloaded models are skipped for a while instead of retried every request.
 const GEMINI_BUSY_MS = 5 * 60_000;
@@ -246,6 +258,9 @@ free-text request if there is one. Workouts and other body habits should suit th
 function send(res: http.ServerResponse, status: number, body: unknown) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, x-app-key',
   });
@@ -257,7 +272,7 @@ async function readJson(req: http.IncomingMessage): Promise<Record<string, unkno
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > MAX_BODY_BYTES) throw new Error('Request too large');
+    if (size > MAX_BODY_BYTES) throw new ProviderError(413, 'That request is too large.');
     chunks.push(chunk);
   }
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
@@ -311,7 +326,7 @@ async function runGemini(route: Route, body: Record<string, unknown>) {
 
   if (!response) throw new ProviderError(504, 'Gemini is busy right now. Try again in a minute.');
   if (!response.ok) {
-    console.error('Gemini error', response.status, JSON.stringify(data));
+    console.error('Gemini error', response.status, errorText(data));
     if (response.status === 429) {
       throw new ProviderError(429, 'Free Gemini limit reached for now. Try again in a minute.');
     }
@@ -340,7 +355,7 @@ async function runGemini(route: Route, body: Record<string, unknown>) {
   }
   const parsed = route.schema.safeParse(json);
   if (!parsed.success) {
-    console.error('Gemini reply did not match the schema', parsed.error);
+    console.error('Gemini reply did not match the schema at', issuePaths(parsed.error));
     throw new ProviderError(502, 'The answer came back in the wrong shape. Try again.');
   }
   return parsed.data;
@@ -373,7 +388,7 @@ async function runGroq(route: Route, body: Record<string, unknown>) {
 
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    console.error('Groq error', response.status, JSON.stringify(data));
+    console.error('Groq error', response.status, errorText(data));
     if (response.status === 401 || response.status === 403) {
       throw new ProviderError(500, 'The AI server has no valid GROQ_API_KEY.');
     }
@@ -392,7 +407,7 @@ async function runGroq(route: Route, body: Record<string, unknown>) {
   }
   const parsed = route.schema.safeParse(json);
   if (!parsed.success) {
-    console.error('Groq reply did not match the schema', parsed.error);
+    console.error('Groq reply did not match the schema at', issuePaths(parsed.error));
     throw new ProviderError(502, 'The answer came back in the wrong shape. Try again.');
   }
   return parsed.data;
@@ -437,6 +452,32 @@ const APP_KEY = process.env.APP_KEY;
 const RATE_LIMIT = Number(process.env.RATE_LIMIT ?? 40);
 const RATE_WINDOW_MS = 10 * 60_000;
 const recent = new Map<string, number[]>();
+// Total AI calls per day across everyone, so a bug or attack can't run up a big bill.
+const DAILY_LIMIT = Number(process.env.DAILY_LIMIT ?? 5000);
+let today = '';
+let todayCount = 0;
+
+function withinDailyBudget() {
+  const day = new Date().toISOString().slice(0, 10);
+  if (day !== today) {
+    today = day;
+    todayCount = 0;
+  }
+  return ++todayCount <= DAILY_LIMIT;
+}
+
+// Compares hashes so the check takes the same time however much of the key is right.
+function keyMatches(sent: string | string[] | undefined) {
+  if (typeof sent !== 'string') return false;
+  const hash = (v: string) => createHash('sha256').update(v).digest();
+  return timingSafeEqual(hash(sent), hash(APP_KEY!));
+}
+
+// A public host must have APP_KEY, or anyone could use (and pay for) the AI.
+if (process.env.NODE_ENV === 'production' && !APP_KEY) {
+  console.error('APP_KEY is not set. Refusing to start in production without it.');
+  process.exit(1);
+}
 
 function allowRequest(ip: string) {
   const now = Date.now();
@@ -458,14 +499,19 @@ const server = http.createServer(async (req, res) => {
   if (!route) return send(res, 404, { error: 'Not found' });
 
   // Once hosted, only the app (which knows APP_KEY) may use the server.
-  if (APP_KEY && req.headers['x-app-key'] !== APP_KEY) {
+  if (APP_KEY && !keyMatches(req.headers['x-app-key'])) {
     return send(res, 401, { error: 'This app version can’t use the AI server. Update the app.' });
   }
+  // The host's proxy appends the real address last; earlier entries can be faked.
   const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '')
-    .split(',')[0]
+    .split(',')
+    .pop()!
     .trim();
   if (!allowRequest(ip)) {
     return send(res, 429, { error: 'Too many AI requests. Try again in a few minutes.' });
+  }
+  if (!withinDailyBudget()) {
+    return send(res, 503, { error: 'Mochi’s AI is very busy today. Try again tomorrow.' });
   }
 
   if (!PROVIDER) {
@@ -493,7 +539,7 @@ const server = http.createServer(async (req, res) => {
       send(res, 400, { error: 'Invalid JSON.' });
     } else {
       console.error(error);
-      send(res, 500, { error: error instanceof Error ? error.message : 'Something went wrong.' });
+      send(res, 500, { error: 'Something went wrong on the AI server. Try again.' });
     }
   }
 });

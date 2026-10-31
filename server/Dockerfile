@@ -6,5 +6,8 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 COPY index.ts ./
 ENV PORT=8787
+ENV NODE_ENV=production
+# Run as the image's unprivileged user, not root.
+USER node
 EXPOSE 8787
 CMD ["node", "index.ts"]

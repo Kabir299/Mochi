@@ -23,6 +23,36 @@ For store builds, set the AI address as EAS environment variables (not in a file
 `npx eas-cli@latest env:create --name EXPO_PUBLIC_AI_URL --value https://<your-app>.onrender.com`
 and the same for `EXPO_PUBLIC_APP_KEY` and `EXPO_PUBLIC_PRIVACY_URL`.
 
+## Before launch: what's left
+
+**I can do these next (no accounts needed):**
+1. Crash safety: a friendly "something went wrong" screen instead of a white screen, and a
+   database-upgrade test so an app update never loses habits.
+2. Store forms, drafted in `STORE_LISTING.md`: Google Play "Data safety" answers, Apple
+   privacy labels, age rating answers and notes for the app reviewers.
+3. Store screenshots: 6 phone-sized images from the app with captions.
+
+**Decisions for you:**
+4. Gemini backup: on Google's *free* tier, Google may use requests to improve its products,
+   which conflicts with the privacy promise. For launch, either leave `GEMINI_API_KEY` out
+   on Render (Groq only, recommended) or turn on billing for Gemini.
+5. Fill in your name and contact email in `PRIVACY.md` and `docs/index.html`.
+
+**Needs your accounts (in order):** GitHub → Render → Expo → RevenueCat + store accounts →
+builds on your phone → friends testing → release. Details in the phases below.
+
+## Security already in place
+
+- App lock with fingerprint / Face ID / PIN; the app is hidden in the app switcher.
+- All data stays on the phone; AI requests are not stored or logged by the server.
+- AI server: app key checked in constant time, per-person rate limit that can't be dodged by
+  faking an IP header, a daily cap on total AI calls (`DAILY_LIMIT`) to protect your bill,
+  200 KB request limit, no internal error details sent back, security headers, runs as a
+  non-root user, and refuses to start in production without `APP_KEY`.
+- Payments go through Apple / Google billing (RevenueCat); the app never handles card data.
+- Later, with accounts: verify Pro on the server (RevenueCat webhooks) so the AI limits per
+  plan can't be bypassed on a modified phone; consider an encrypted database (SQLCipher).
+
 ---
 
 ## Phase 1 — Put the code somewhere safe (15 min)
@@ -68,12 +98,22 @@ Notes:
    offline, syncs when online), account deletion (both stores require it).
 4. **Claude:** friends: invite link, see each other's streaks, send a nudge.
 
-## Phase 5 — Get paid (1 session)
+## Phase 5 — Get paid
 
-1. **You:** RevenueCat account (free until $2.5k/month revenue), connect both stores.
-2. **Claude:** replace the test "Unlock Pro" switch with real purchases, a 7-day trial shown
-   after setup, and "Restore purchases".
-3. **You:** pick prices (suggested: ₹129/month, ₹799/year in India; $3.99 / $24.99 elsewhere).
+Already built: a paywall with yearly/monthly plans, free-trial text, Restore purchases,
+Manage subscription, and Pro that follows the store (renewals, cancellations, refunds).
+Stripe or Razorpay can't be used for Pro: both stores require their own billing for digital
+subscriptions.
+
+1. **You:** in Play Console and App Store Connect, create two subscriptions (monthly, yearly),
+   each with a 7-day free trial. Suggested prices: ₹129/month and ₹799/year in India, $3.99 and
+   $24.99 elsewhere.
+2. **You:** RevenueCat account (free until $2.5k/month revenue). Connect both stores, add the
+   products, make an entitlement called `pro` and an offering with both packages.
+3. **You:** copy RevenueCat's public SDK keys (they are safe in the app) into EAS:
+   `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` and `EXPO_PUBLIC_REVENUECAT_IOS_KEY`. Once they are set,
+   store builds show the paywall; without them, everything stays free.
+4. **Claude:** test purchases with Play test accounts and Apple sandbox testers.
 
 ## Phase 6 — Store release
 

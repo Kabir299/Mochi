@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { closeModal } from '@/lib/nav';
 import { ModalHeader } from '@/components/ModalHeader';
+import { PrivacyNote } from '@/components/PrivacyNote';
 import { Segmented } from '@/components/Segmented';
 import { FoodEstimate, requestFoodEstimate } from '@/lib/ai';
 import { toDateKey } from '@/lib/dates';
@@ -140,6 +141,7 @@ export default function FoodFormScreen() {
             </Pressable>
           }
         />
+        <PrivacyNote text="Food is saved on this phone. The AI estimate sends only the meal text, deleted right after." />
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.field}>
             <Text style={styles.label}>What did you eat?</Text>

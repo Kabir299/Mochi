@@ -13,6 +13,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ModalHeader } from '@/components/ModalHeader';
+import { PrivacyNote } from '@/components/PrivacyNote';
 import { ProLock } from '@/components/ProLock';
 import { DumpTask, minuteToTime, requestBrainDump, timeToMinute } from '@/lib/ai';
 import { formatMinute, fromDateKey, toDateKey } from '@/lib/dates';
@@ -24,7 +25,7 @@ import { colors, radius, spacing } from '@/theme';
 
 const FALLBACK_ICON: IconName = 'checkmark-circle-outline';
 
-// Ramble (type or dictate with the keyboard mic), then review what Claude pulled out.
+// Ramble (type or dictate with the keyboard mic), then review what the AI pulled out.
 export default function BrainDumpScreen() {
   const { day: dayParam } = useLocalSearchParams<{ day?: string }>();
   const day = dayParam ?? toDateKey(new Date());
@@ -99,11 +100,12 @@ export default function BrainDumpScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ModalHeader title="Brain dump" />
+      <PrivacyNote />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {!isPro ? (
           <ProLock
             title="Ramble, get a to-do list"
-            body="Talk through everything on your mind. Claude turns it into tasks with times you can review before adding."
+            body="Talk through everything on your mind. Mochi turns it into tasks with times you can review before adding."
           />
         ) : !tasks ? (
           <>

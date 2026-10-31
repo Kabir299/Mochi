@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ModalHeader } from '@/components/ModalHeader';
+import { PrivacyNote } from '@/components/PrivacyNote';
 import { ProLock } from '@/components/ProLock';
 import { ChatMessage, requestChat } from '@/lib/ai';
 import { useSettings } from '@/state/settings';
@@ -57,6 +58,7 @@ export default function CoachScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ModalHeader title="Coach" />
+      <PrivacyNote />
       {!isPro ? (
         <View style={styles.pad}>
           <ProLock

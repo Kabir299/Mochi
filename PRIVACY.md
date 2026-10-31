@@ -26,6 +26,17 @@ requests or use them for advertising. The providers process them under their own
 which do not allow training on API data by default. To stop abuse, the server briefly keeps
 a count of requests per IP address in memory; it is not written to disk.
 
+## Purchases
+
+Mochi Pro is bought through the App Store or Google Play; we never see your card details.
+To confirm your subscription, RevenueCat (our purchase service) receives an anonymous app ID
+and your store purchase receipts. It is not linked to your name or email.
+
+## App lock
+
+If you turn on App lock, your phone checks your fingerprint, face or PIN itself. The app only
+learns "unlocked" or "not unlocked" and never sees or stores the biometric data.
+
 ## Notifications
 
 Reminders are scheduled on your phone. Nothing about them is sent to us.
@@ -33,7 +44,7 @@ Reminders are scheduled on your phone. Nothing about them is sent to us.
 ## Things the app does not do
 
 - No accounts, ads, analytics or tracking SDKs
-- No selling or sharing of data with anyone except the AI provider, as above
+- No selling or sharing of data with anyone except the AI provider and RevenueCat, as above
 - Not intended for children under 13
 
 ## Changes and contact

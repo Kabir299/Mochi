@@ -15,6 +15,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Pet } from '@/components/Pet';
+import { PRIVACY_SHORT, PrivacyNote } from '@/components/PrivacyNote';
 import { requestOnboardPlan, timeToMinute } from '@/lib/ai';
 import { formatDuration, formatMinute } from '@/lib/dates';
 import { HABIT_ICONS } from '@/lib/icons';
@@ -192,6 +193,7 @@ export default function OnboardingScreen() {
               Answer a few quick questions and I’ll build your first plan around your goals and
               the hours you work best.
             </Text>
+            <PrivacyNote text={PRIVACY_SHORT} />
           </View>
         )}
 
