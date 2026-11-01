@@ -66,12 +66,6 @@ export type FoodLog = {
 
 export type FoodInput = Omit<FoodLog, 'id'>;
 
-// The evening recap: how the whole day felt, and one line about it.
-export type DayLog = {
-  day: DateKey;
-  mood: number | null;
-  note: string | null;
-};
 
 const DATABASE_VERSION = 8;
 
@@ -170,14 +164,9 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
   }
 
   if (version === 7) {
-    await db.execAsync(`
-      CREATE TABLE day_logs (
-        day TEXT PRIMARY KEY NOT NULL,
-        mood INTEGER,
-        note TEXT,
-        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-    `);
+    // Version 8 briefly added a day recap table; the feature was removed. Installs that
+    // got it drop it here, the rest just move on, so later versions stay in step.
+    await db.execAsync('DROP TABLE IF EXISTS day_logs;');
     version = 8;
   }
 
@@ -351,31 +340,15 @@ export async function setSortOrders(db: SQLiteDatabase, ids: number[]) {
 }
 
 // Everything the user has entered, for export.
-export function getDayLogs(db: SQLiteDatabase) {
-  return db.getAllAsync<DayLog>('SELECT day, mood, note FROM day_logs ORDER BY day');
-}
-
-export function saveDayLog(db: SQLiteDatabase, log: DayLog) {
-  return db.runAsync(
-    `INSERT INTO day_logs (day, mood, note) VALUES (?, ?, ?)
-     ON CONFLICT (day) DO UPDATE SET mood = excluded.mood, note = excluded.note,
-       updated_at = datetime('now')`,
-    log.day,
-    log.mood,
-    log.note,
-  );
-}
-
 export async function exportAll(db: SQLiteDatabase) {
-  const [habits, logs, water, food, days, settings] = await Promise.all([
+  const [habits, logs, water, food, settings] = await Promise.all([
     db.getAllAsync('SELECT * FROM habits'),
     db.getAllAsync('SELECT * FROM logs'),
     db.getAllAsync('SELECT * FROM water_logs'),
     db.getAllAsync('SELECT * FROM food_logs'),
-    db.getAllAsync('SELECT * FROM day_logs'),
     db.getAllAsync('SELECT * FROM settings'),
   ]);
-  return { exported_at: new Date().toISOString(), habits, logs, water, food, days, settings };
+  return { exported_at: new Date().toISOString(), habits, logs, water, food, settings };
 }
 
 // Wipes all data. The starter set is not re-added.
@@ -385,7 +358,6 @@ export async function deleteAllData(db: SQLiteDatabase) {
     await db.runAsync('DELETE FROM habits');
     await db.runAsync('DELETE FROM water_logs');
     await db.runAsync('DELETE FROM food_logs');
-    await db.runAsync('DELETE FROM day_logs');
     await db.runAsync("DELETE FROM settings WHERE key != 'starterSeeded'");
   });
 }

@@ -1,31 +1,24 @@
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 
 import { addDays, toDateKey } from '@/lib/dates';
-import { parseDays, yesterdayStatus } from '@/lib/streak';
-import { useDayLogs } from '@/state/dayLogs';
+import { parseDays, withRestDays, yesterdayStatus } from '@/lib/streak';
 import { IconName, useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
 import { colors, radius, spacing } from '@/theme';
 
-// The evening recap is offered from this hour on.
-const RECAP_FROM_HOUR = 19;
-
 // Kind words about yesterday on Today: a freeze that saved the streak, an offer to
 // repair a broken one by finishing today at 100%, its progress, and the result.
-// In the evening it also invites a short recap of the day.
 export function DayCheck({ today }: { today: Date }) {
-  const { firstDay, dayProgress, habitsOn } = useHabits();
+  const { firstDay, dayProgress } = useHabits();
   const settings = useSettings();
-  const { loaded, dayLogFor } = useDayLogs();
   const todayKey = toDateKey(today);
   const yesterday = toDateKey(addDays(today, -1));
   const status = yesterdayStatus(
     firstDay,
     today,
-    dayProgress,
+    withRestDays(dayProgress, settings.isPro ? settings.restDays : '', settings.streakThreshold),
     settings.repairedDays,
     settings.streakThreshold,
     settings.freezesPerMonth,
@@ -103,24 +96,7 @@ export function DayCheck({ today }: { today: Date }) {
     );
   }
 
-  const evening = new Date().getHours() >= RECAP_FROM_HOUR && todayKey === toDateKey(new Date());
-  const showRecap =
-    loaded && evening && habitsOn(todayKey).length > 0 && !dayLogFor(todayKey);
-
-  return (
-    <>
-      {card}
-      {showRecap && (
-        <Card
-          icon="moon-outline"
-          tone="calm"
-          title="Wrap up your day"
-          body="30 seconds: how it felt, and what moves to tomorrow."
-          primary={{ label: 'Start', onPress: () => router.push('/recap') }}
-        />
-      )}
-    </>
-  );
+  return card;
 }
 
 function Card({

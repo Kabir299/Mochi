@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 
 import { buildPayload } from '@/lib/ai';
 import { parseProfile } from '@/lib/profile';
-import { useDayLogs } from '@/state/dayLogs';
 import { useHabits } from '@/state/habits';
 import { useNutrition } from '@/state/nutrition';
 import { useSettings } from '@/state/settings';
@@ -13,7 +12,6 @@ export function useAiPayload() {
   const { habits, dayProgress, habitProgress, streakFor } = useHabits();
   const { water, food, waterFor, foodFor } = useNutrition();
   const settings = useSettings();
-  const { dayLogFor } = useDayLogs();
 
   return useCallback(() => {
     const hasNutrition = settings.isPro || water.length > 0 || food.length > 0;
@@ -24,7 +22,6 @@ export function useAiPayload() {
       habitProgress,
       streakFor,
       profile: parseProfile(settings.profile) ?? undefined,
-      dayLogFor,
       nutrition: hasNutrition
         ? {
             waterGoalMl: settings.waterGoalMl,
@@ -45,6 +42,5 @@ export function useAiPayload() {
     waterFor,
     foodFor,
     settings,
-    dayLogFor,
   ]);
 }

@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
-import { router, type Href } from 'expo-router';
 
 import { toDateKey } from '@/lib/dates';
-import { onReminderTap, syncReminders } from '@/lib/reminders';
+import { syncReminders } from '@/lib/reminders';
 import { useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
 
@@ -10,7 +9,11 @@ import { useSettings } from '@/state/settings';
 export function ReminderSync() {
   const { loaded, habits, dayProgress } = useHabits();
   const settings = useSettings();
-  const streakSecured = (dayProgress(toDateKey(new Date())) ?? 0) >= settings.streakThreshold;
+  // No "streak at risk" nudge on a Pro rest day.
+  const restToday =
+    settings.isPro && settings.restDays.split(',').includes(String(new Date().getDay()));
+  const streakSecured =
+    restToday || (dayProgress(toDateKey(new Date())) ?? 0) >= settings.streakThreshold;
 
   // Only what affects the schedule, so ordinary taps don't reschedule.
   const signature = JSON.stringify([
@@ -21,10 +24,7 @@ export function ReminderSync() {
     settings.petName,
     settings.reminderLead,
     settings.weeklyRecap,
-    settings.eveningRecap,
   ]);
-
-  useEffect(() => onReminderTap((url) => router.push(url as Href)), []);
 
   useEffect(() => {
     if (!loaded || !settings.loaded) return;
@@ -36,7 +36,6 @@ export function ReminderSync() {
       petName: settings.petName,
       reminderLead: settings.reminderLead,
       weeklyRecap: settings.weeklyRecap,
-      eveningRecap: settings.eveningRecap,
     }).catch(() => {
       // Notifications are best effort; the app works without them.
     });

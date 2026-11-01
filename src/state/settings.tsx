@@ -47,8 +47,8 @@ export type Settings = {
   repairPending: string;
   // The last missed day whose card was answered or dismissed, so it shows once.
   dayCheckSeen: string;
-  // 9:30 PM "how did today go?" notification.
-  eveningRecap: boolean;
+  // Pro: weekdays (0 = Sunday, comma separated) where skipping keeps the streak.
+  restDays: string;
 };
 
 const DEFAULTS: Settings = {
@@ -72,7 +72,7 @@ const DEFAULTS: Settings = {
   repairedDays: '',
   repairPending: '',
   dayCheckSeen: '',
-  eveningRecap: true,
+  restDays: '0',
 };
 
 type SettingsContextValue = Settings & {
@@ -112,8 +112,7 @@ function parse(raw: Record<string, string>): Settings {
     repairedDays: raw.repairedDays ?? '',
     repairPending: raw.repairPending ?? '',
     dayCheckSeen: raw.dayCheckSeen ?? '',
-    eveningRecap:
-      raw.eveningRecap !== undefined ? raw.eveningRecap === '1' : DEFAULTS.eveningRecap,
+    restDays: raw.restDays ?? DEFAULTS.restDays,
     profile: raw.profile ?? '',
   };
 }

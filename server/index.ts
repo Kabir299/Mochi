@@ -79,11 +79,7 @@ Tone: honest but encouraging, like a good friend who is also a coach.
 - Find genuine wins even in a hard month (showing up at all, one habit holding, a good
   streak last week). Don't invent praise; if there is little to praise, praise the effort
   of checking in.
-- End on something motivating and specific about the coming week.
-
-day_recaps, when present, say how each day felt and a line the person wrote. Use them to
-connect feelings to habits ("your Great days were the ones with a morning workout"), and
-quote their words back only briefly and kindly.`;
+- End on something motivating and specific about the coming week.`;
 
 const Time = z.string().describe('24-hour local time, "HH:MM"');
 

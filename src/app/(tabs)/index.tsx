@@ -28,7 +28,7 @@ import { DayCheck } from '@/components/DayCheck';
 import { cheer } from '@/lib/encouragement';
 import { useToday } from '@/lib/useToday';
 import { STARTER_HABITS } from '@/lib/starter';
-import { computeDayStreak, withRepairs } from '@/lib/streak';
+import { computeDayStreak, streakProgress } from '@/lib/streak';
 import { Habit, useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
 import { colors, radius, spacing } from '@/theme';
@@ -121,7 +121,11 @@ export default function TodayScreen() {
   const dayStreak = computeDayStreak(
     firstDay,
     today,
-    withRepairs(dayProgress, settings.repairedDays),
+    streakProgress(dayProgress, {
+      repairedDays: settings.repairedDays,
+      restDays: settings.isPro ? settings.restDays : '',
+      threshold: settings.streakThreshold,
+    }),
     settings.streakThreshold,
     settings.freezesPerMonth,
   );

@@ -43,6 +43,11 @@ const FEATURES: { icon: IconName; title: string; body: string }[] = [
     body: 'Say your day out loud and get a timed plan; chat with a coach who knows your habits.',
   },
   {
+    icon: 'bed-outline',
+    title: 'Rest days',
+    body: 'Pick days off, like Sunday, that never break your streak.',
+  },
+  {
     icon: 'water-outline',
     title: 'Water tracking',
     body: 'One-tap glasses, a daily goal and your 7-day history.',

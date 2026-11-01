@@ -10,7 +10,7 @@ import { YearHeatmap } from '@/components/YearHeatmap';
 import { badgesFor } from '@/lib/badges';
 import { addDays, lastNDays, toDateKey } from '@/lib/dates';
 import { useToday } from '@/lib/useToday';
-import { computeDayStreak, withRepairs } from '@/lib/streak';
+import { computeDayStreak, streakProgress } from '@/lib/streak';
 import { useSettings } from '@/state/settings';
 import { average, habitStats, insights, pct, points1, series } from '@/lib/stats';
 import { useHabits } from '@/state/habits';
@@ -42,7 +42,11 @@ export default function ProgressScreen() {
   const dayStreak = computeDayStreak(
     firstDay,
     today,
-    withRepairs(dayProgress, settings.repairedDays),
+    streakProgress(dayProgress, {
+      repairedDays: settings.repairedDays,
+      restDays: settings.isPro ? settings.restDays : '',
+      threshold: settings.streakThreshold,
+    }),
     settings.streakThreshold,
     settings.freezesPerMonth,
   );

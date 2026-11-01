@@ -108,3 +108,27 @@ export function yesterdayStatus(
   const usedThisMonth = [...parseDays(repairedCsv)].filter((d) => d.startsWith(month)).length;
   return { kind: 'broken', day, lost, canRepair: usedThisMonth < REPAIRS_PER_MONTH };
 }
+
+// Rest days (Pro): weekdays (0 = Sunday) where skipping doesn't break the streak. A rest
+// day that was done anyway still counts.
+export function withRestDays(
+  dayProgress: (day: DateKey) => number | null,
+  restDaysCsv: string,
+  threshold = STREAK_THRESHOLD,
+): (day: DateKey) => number | null {
+  const rest = new Set(restDaysCsv.split(',').filter(Boolean).map(Number));
+  if (rest.size === 0) return dayProgress;
+  return (day) => {
+    const progress = dayProgress(day);
+    if (progress === null || progress >= threshold) return progress;
+    return rest.has(fromDateKey(day).getDay()) ? null : progress;
+  };
+}
+
+// The day progress the streak is counted from: rest days and repairs applied.
+export function streakProgress(
+  dayProgress: (day: DateKey) => number | null,
+  opts: { repairedDays: string; restDays: string; threshold: number },
+) {
+  return withRepairs(withRestDays(dayProgress, opts.restDays, opts.threshold), opts.repairedDays);
+}

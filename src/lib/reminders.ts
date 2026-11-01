@@ -7,7 +7,6 @@ import type { Habit } from '@/state/habits';
 
 const CHANNEL = 'reminders';
 const NUDGE_MINUTE = 20 * 60;
-const RECAP_MINUTE = 21 * 60 + 30;
 // iOS keeps at most 64 scheduled notifications per app.
 const MAX_SCHEDULED = 60;
 
@@ -44,7 +43,6 @@ type SyncInput = {
   petName: string;
   reminderLead: number;
   weeklyRecap: boolean;
-  eveningRecap: boolean;
 };
 
 async function ensureChannel(Notifications: typeof NotificationsModule) {
@@ -84,9 +82,7 @@ export async function syncReminders(input: SyncInput) {
   if (!remindersSupported) return;
   const Notifications = await notifications();
   await Notifications.cancelAllScheduledNotificationsAsync();
-  if (!input.remindersOn && !input.streakNudge && !input.weeklyRecap && !input.eveningRecap) {
-    return;
-  }
+  if (!input.remindersOn && !input.streakNudge && !input.weeklyRecap) return;
   await ensureChannel(Notifications);
   if (!(await Notifications.getPermissionsAsync()).granted) return;
 
@@ -171,23 +167,6 @@ export async function syncReminders(input: SyncInput) {
     }
   }
 
-  // Every evening, a gentle invitation to wrap up the day. Tapping it opens the recap.
-  if (input.eveningRecap) {
-    requests.unshift({
-      content: {
-        title: 'How did today go?',
-        body: `30 seconds with ${input.petName}: how it felt and what moves to tomorrow.`,
-        data: { url: '/recap' },
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: Math.floor(RECAP_MINUTE / 60),
-        minute: RECAP_MINUTE % 60,
-        channelId: CHANNEL,
-      },
-    });
-  }
-
   // Sunday 7 PM, a nudge to look back at the week.
   if (input.weeklyRecap) {
     requests.unshift({
@@ -210,24 +189,3 @@ export async function syncReminders(input: SyncInput) {
   }
 }
 
-// Opens the screen a tapped notification points to (its data.url), including the one
-// that launched the app. Returns a function that stops listening.
-export function onReminderTap(open: (url: string) => void) {
-  if (!remindersSupported) return () => {};
-  let stopped = false;
-  let remove = () => {};
-  notifications().then((Notifications) => {
-    if (stopped) return;
-    const handle = (response: NotificationsModule.NotificationResponse | null) => {
-      const url = response?.notification.request.content.data?.url;
-      if (typeof url === 'string' && url.startsWith('/')) open(url);
-    };
-    Notifications.getLastNotificationResponseAsync().then(handle);
-    const sub = Notifications.addNotificationResponseReceivedListener(handle);
-    remove = () => sub.remove();
-  });
-  return () => {
-    stopped = true;
-    remove();
-  };
-}

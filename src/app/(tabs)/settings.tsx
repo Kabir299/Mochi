@@ -23,7 +23,6 @@ import { confirmDestructive } from '@/lib/confirm';
 import * as db from '@/lib/db';
 import { lockSupported, lockUnavailableReason, unlock } from '@/lib/lock';
 import { remindersSupported, requestReminderPermission } from '@/lib/reminders';
-import { useDayLogs } from '@/state/dayLogs';
 import { useHabits } from '@/state/habits';
 import { useNutrition } from '@/state/nutrition';
 import { FREE_LAUNCH, useSettings } from '@/state/settings';
@@ -39,6 +38,16 @@ const THRESHOLDS = [
 type Threshold = (typeof THRESHOLDS)[number][0];
 
 const MAX_FREEZES = 5;
+// Monday first; values are JS weekdays (0 = Sunday).
+const WEEKDAYS = [
+  [1, 'Mon'],
+  [2, 'Tue'],
+  [3, 'Wed'],
+  [4, 'Thu'],
+  [5, 'Fri'],
+  [6, 'Sat'],
+  [0, 'Sun'],
+] as const;
 // Set once PRIVACY.md is hosted (e.g. on GitHub Pages).
 const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL;
 
@@ -47,7 +56,6 @@ export default function SettingsScreen() {
   const settings = useSettings();
   const { archivedHabits, archiveHabit, removeHabit, reload } = useHabits();
   const nutrition = useNutrition();
-  const dayLogs = useDayLogs();
   const [petName, setPetName] = useState(settings.petName);
 
   const exportData = async () => {
@@ -85,7 +93,7 @@ export default function SettingsScreen() {
     );
     if (!ok) return;
     await db.deleteAllData(database);
-    await Promise.all([reload(), nutrition.reload(), dayLogs.reload()]);
+    await Promise.all([reload(), nutrition.reload()]);
     // Back to the setup questions, like a fresh install.
     await settings.update({ petName: 'Mochi', onboarded: false });
     setPetName('Mochi');
@@ -112,6 +120,39 @@ export default function SettingsScreen() {
               }
             />
           </View>
+          <View style={styles.restHead}>
+            <Text style={styles.label}>Rest days</Text>
+            {!settings.isPro && <Text style={styles.proBadge}>PRO</Text>}
+          </View>
+          <View style={styles.leadRow}>
+            {WEEKDAYS.map(([wd, label]) => {
+              const rest = settings.restDays.split(',').filter(Boolean).map(Number);
+              const on = settings.isPro && rest.includes(wd);
+              return (
+                <Pressable
+                  key={wd}
+                  onPress={() => {
+                    if (!settings.isPro) {
+                      router.push('/pro');
+                      return;
+                    }
+                    const next = on ? rest.filter((d) => d !== wd) : [...rest, wd];
+                    settings.update({ restDays: next.join(',') });
+                  }}
+                  style={[styles.leadChip, on && styles.leadChipOn]}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on }}
+                >
+                  <Text style={[styles.leadText, on && styles.leadTextOn]}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.hint}>
+            {settings.isPro
+              ? 'Skipping these days won’t break your streak. Doing them still counts.'
+              : 'Take a day off without losing your streak. Part of Pro.'}
+          </Text>
         </Section>
 
         <Section title="Your pet">
@@ -171,14 +212,6 @@ export default function SettingsScreen() {
             onChange={async (v) => {
               const allowed = v ? await requestReminderPermission() : false;
               settings.update({ weeklyRecap: v && allowed });
-            }}
-          />
-          <ToggleRow
-            label="Evening recap at 9:30 PM"
-            value={settings.eveningRecap}
-            onChange={async (v) => {
-              const allowed = v ? await requestReminderPermission() : false;
-              settings.update({ eveningRecap: v && allowed });
             }}
           />
           {!remindersSupported && (
@@ -382,6 +415,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
     minHeight: 36,
+  },
+  hint: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
+  restHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  proBadge: {
+    color: colors.streak,
+    backgroundColor: colors.proBg,
+    fontSize: 10,
+    fontWeight: '700',
+    borderRadius: radius.pill,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    overflow: 'hidden',
   },
   leadRow: {
     flexDirection: 'row',

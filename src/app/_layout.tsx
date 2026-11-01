@@ -9,7 +9,6 @@ import { PurchasesSync } from '@/components/PurchasesSync';
 import { ReminderSync } from '@/components/ReminderSync';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/lib/db';
 import { applyKey, DbChoice, prepareDatabase } from '@/lib/secureDb';
-import { DayLogsProvider } from '@/state/dayLogs';
 import { HabitsProvider } from '@/state/habits';
 import { NutritionProvider } from '@/state/nutrition';
 import { SettingsProvider } from '@/state/settings';
@@ -44,7 +43,6 @@ export default function RootLayout() {
         <SettingsProvider>
           <HabitsProvider>
             <NutritionProvider>
-              <DayLogsProvider>
               <StatusBar style="light" />
               <ReminderSync />
               <PurchasesSync />
@@ -68,10 +66,8 @@ export default function RootLayout() {
                 <Stack.Screen name="plan-day" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="pet" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="share-card" options={{ presentation: 'modal' }} />
-                <Stack.Screen name="recap" options={{ presentation: 'modal' }} />
               </Stack>
               <AppLock />
-              </DayLogsProvider>
             </NutritionProvider>
           </HabitsProvider>
         </SettingsProvider>
