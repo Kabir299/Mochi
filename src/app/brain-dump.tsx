@@ -86,7 +86,7 @@ export default function BrainDumpScreen() {
         repeat: task.repeat === 'daily' ? 'daily' : 'once',
         weight: Math.min(3, Math.max(1, Math.round(task.weight || 2))),
         startMinute: start,
-        durationMin: start === null ? null : Math.max(5, task.duration_min ?? 30),
+        durationMin: task.duration_min ? Math.max(5, task.duration_min) : start === null ? null : 30,
         days: [],
         onceDay: day,
         startDay: day < toDateKey(new Date()) ? day : undefined,

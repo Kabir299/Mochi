@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BodyGoalCard } from '@/components/BodyGoalCard';
 import { ProgressChart } from '@/components/ProgressChart';
 import { ProLock } from '@/components/ProLock';
 import { lastNDays, toDateKey } from '@/lib/dates';
@@ -53,6 +54,7 @@ export default function NutritionScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Nutrition</Text>
+        <BodyGoalCard />
 
         {!settings.isPro ? (
           <ProLock

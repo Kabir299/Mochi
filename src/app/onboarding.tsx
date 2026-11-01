@@ -25,9 +25,7 @@ import {
   GOALS,
   PACES,
   parseProfile,
-  PHYSIQUES,
   PlanHabit,
-  PRIME_TIMES,
   Profile,
   suggestedTargets,
 } from '@/lib/profile';
@@ -38,22 +36,19 @@ import { useSettings } from '@/state/settings';
 import { colors, radius, spacing } from '@/theme';
 
 const WAKE_TIMES = [300, 330, 360, 390, 420, 450, 480, 540, 600];
-const WORK_HOURS = [0, 1, 2, 3, 4, 6, 8];
 const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FALLBACK_ICON: IconName = 'checkmark-circle-outline';
-const STEPS = 5;
+const STEPS = 3;
 
 // First launch: a few questions about the person, then a starting plan built
-// around them. Also reachable from Settings → Redo setup.
+// around them. Also reachable from Settings → Redo setup. The body goal is asked on
+// the Nutrition tab, and when / how long to work in Plan my day.
 export default function OnboardingScreen() {
   const { redo } = useLocalSearchParams<{ redo?: string }>();
   const settings = useSettings();
   const { habits, addHabit } = useHabits();
   const [profile, setProfile] = useState<Profile>(
     () => parseProfile(settings.profile) ?? DEFAULT_PROFILE,
-  );
-  const [weightText, setWeightText] = useState(() =>
-    profile.weightKg ? String(profile.weightKg) : '',
   );
   const [step, setStep] = useState(0);
   const [plan, setPlan] = useState<PlanHabit[]>([]);
@@ -190,8 +185,7 @@ export default function OnboardingScreen() {
             <Pet mood="happy" />
             <Text style={styles.title}>Hi, I’m {settings.petName}!</Text>
             <Text style={styles.lead}>
-              Answer a few quick questions and I’ll build your first plan around your goals and
-              the hours you work best.
+              Answer a few quick questions and I’ll build your first plan around your goals.
             </Text>
             <PrivacyNote text={PRIVACY_SHORT} />
           </View>
@@ -243,41 +237,6 @@ export default function OnboardingScreen() {
 
         {step === 2 && (
           <>
-            <Text style={styles.title}>What’s your body goal?</Text>
-            {PHYSIQUES.map((o) => (
-              <OptionCard
-                key={o.id}
-                label={o.label}
-                hint={o.hint}
-                on={profile.physique === o.id}
-                onPress={() => set({ physique: o.id })}
-              />
-            ))}
-            {profile.physique !== 'none' && (
-              <>
-                <Text style={styles.label}>Your weight in kg (optional)</Text>
-                <TextInput
-                  value={weightText}
-                  onChangeText={(t) => {
-                    const clean = t.replace(/[^0-9.]/g, '');
-                    setWeightText(clean);
-                    const kg = Number(clean);
-                    set({ weightKg: kg >= 25 && kg <= 300 ? kg : null });
-                  }}
-                  placeholder="e.g. 70"
-                  placeholderTextColor={colors.iconMuted}
-                  keyboardType="decimal-pad"
-                  style={styles.input}
-                  maxLength={5}
-                />
-                <Text style={styles.hint}>Used to set your calorie, protein and water goals.</Text>
-              </>
-            )}
-          </>
-        )}
-
-        {step === 3 && (
-          <>
             <Text style={styles.title}>What does your day look like?</Text>
             <Text style={styles.label}>I usually wake up at</Text>
             <View style={styles.chips}>
@@ -298,41 +257,6 @@ export default function OnboardingScreen() {
                 );
               })}
             </View>
-            <Text style={styles.label}>I focus best in the</Text>
-            {PRIME_TIMES.map((t) => (
-              <OptionCard
-                key={t.id}
-                label={t.label}
-                hint={`${formatMinute(t.start)} – ${formatMinute((t.start + t.length) % 1440)}`}
-                on={profile.primeTime === t.id}
-                onPress={() => set({ primeTime: t.id })}
-              />
-            ))}
-          </>
-        )}
-
-        {step === 4 && (
-          <>
-            <Text style={styles.title}>How much do you want to work?</Text>
-            <Text style={styles.label}>Focused work or study per day</Text>
-            <View style={styles.chips}>
-              {WORK_HOURS.map((h) => {
-                const on = profile.workHours === h;
-                return (
-                  <Pressable
-                    key={h}
-                    onPress={() => set({ workHours: h })}
-                    style={[styles.chip, on && styles.chipOn]}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: on }}
-                  >
-                    <Text style={[styles.chipText, on && styles.chipTextOn]}>
-                      {h === 0 ? 'None' : `${h} h`}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
             <Text style={styles.label}>Pace</Text>
             {PACES.map((o) => (
               <OptionCard
@@ -346,7 +270,7 @@ export default function OnboardingScreen() {
           </>
         )}
 
-        {step === 5 && (
+        {step === 3 && (
           <>
             <Text style={styles.title}>Your starting plan</Text>
             {summary !== '' && <Text style={styles.lead}>{summary}</Text>}

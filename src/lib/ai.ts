@@ -170,8 +170,18 @@ export function requestAnalysis(payload: ReturnType<typeof buildPayload>) {
   return post<Analysis>('/analyze', payload);
 }
 
+export type Priority = 'high' | 'medium' | 'low';
+
 export type DayPlan = {
-  plan: { id: number; start_time: string; duration_min: number; reason: string }[];
+  plan: {
+    id: number;
+    start_time: string;
+    duration_min: number;
+    priority: Priority;
+    reason: string;
+  }[];
+  // Tasks left out because they didn't fit the time budget or window.
+  skipped: { id: number; reason: string }[];
   summary: string;
 };
 
@@ -182,9 +192,19 @@ export type PlanTask = {
   duration_min: number | null;
   done: boolean;
   fixed: boolean;
+  // null lets the AI decide.
+  priority: Priority | null;
 };
 
-export function requestDayPlan(body: { day: string; now: string; tasks: PlanTask[] }) {
+export function requestDayPlan(body: {
+  day: string;
+  now: string;
+  // When the person wants to do the flexible tasks; null means any time.
+  work_window: { from: string; to: string } | null;
+  // Total minutes for all flexible tasks together; null means no limit.
+  time_budget_min: number | null;
+  tasks: PlanTask[];
+}) {
   return post<DayPlan>('/plan-day', body);
 }
 

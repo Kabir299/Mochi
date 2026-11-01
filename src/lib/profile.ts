@@ -1,8 +1,9 @@
 import type { HabitInput, IconName } from '@/state/habits';
 import type { Settings } from '@/state/settings';
 
-// What the user told us on first launch, used to build their first plan and
-// passed to the AI coach so its advice fits them.
+// What the user told us on first launch (and the body goal from the Nutrition tab),
+// used to build their plan and passed to the AI coach so its advice fits them.
+// When to work, and for how long, is asked in Plan my day instead.
 export type GoalId =
   | 'workout'
   | 'sleep'
@@ -16,7 +17,6 @@ export type GoalId =
   | 'screen'
   | 'journal';
 export type Physique = 'lose_fat' | 'build_muscle' | 'fitter' | 'maintain' | 'none';
-export type PrimeTime = 'early' | 'morning' | 'afternoon' | 'evening' | 'night';
 export type Pace = 'easy' | 'steady' | 'all_in';
 
 export type Profile = {
@@ -25,9 +25,6 @@ export type Profile = {
   physique: Physique;
   weightKg: number | null;
   wakeMinute: number;
-  primeTime: PrimeTime;
-  // Hours of focused work (or study) wanted per day.
-  workHours: number;
   pace: Pace;
 };
 
@@ -37,8 +34,6 @@ export const DEFAULT_PROFILE: Profile = {
   physique: 'none',
   weightKg: null,
   wakeMinute: 7 * 60,
-  primeTime: 'morning',
-  workHours: 2,
   pace: 'easy',
 };
 
@@ -64,15 +59,6 @@ export const PHYSIQUES: { id: Physique; label: string; hint: string }[] = [
   { id: 'none', label: 'Not a focus right now', hint: 'Skip body goals' },
 ];
 
-// Where each prime time starts, and how long it lasts, in minutes after midnight.
-export const PRIME_TIMES: { id: PrimeTime; label: string; start: number; length: number }[] = [
-  { id: 'early', label: 'Early morning', start: 5 * 60 + 30, length: 3 * 60 },
-  { id: 'morning', label: 'Morning', start: 9 * 60, length: 3 * 60 },
-  { id: 'afternoon', label: 'Afternoon', start: 14 * 60, length: 3 * 60 },
-  { id: 'evening', label: 'Evening', start: 18 * 60, length: 3 * 60 },
-  { id: 'night', label: 'Late night', start: 21 * 60 + 30, length: 3 * 60 },
-];
-
 export const PACES: { id: Pace; label: string; hint: string }[] = [
   { id: 'easy', label: 'Easy start', hint: 'A few small habits, build up slowly' },
   { id: 'steady', label: 'Steady', hint: 'A balanced plan you can keep' },
@@ -82,7 +68,9 @@ export const PACES: { id: Pace; label: string; hint: string }[] = [
 export function parseProfile(raw: string): Profile | null {
   if (!raw) return null;
   try {
-    return { ...DEFAULT_PROFILE, ...JSON.parse(raw) };
+    // Older saves also had primeTime / workHours; they are simply dropped.
+    const { primeTime: _p, workHours: _w, ...saved } = JSON.parse(raw);
+    return { ...DEFAULT_PROFILE, ...saved };
   } catch {
     return null;
   }
@@ -91,14 +79,13 @@ export function parseProfile(raw: string): Profile | null {
 // A habit in the suggested plan, with a short reason shown on the review screen.
 export type PlanHabit = HabitInput & { why: string };
 
-const WEEKDAYS = [1, 2, 3, 4, 5];
 const DAY = 24 * 60;
 
 // Builds a plan on the phone from the answers, without the AI. Timed habits are
-// placed so they don't overlap, work goes into the prime time, and the pace
+// placed so they don't overlap (with each other or the `taken` slots), and the pace
 // decides how many habits and how big they are.
-export function buildLocalPlan(p: Profile): PlanHabit[] {
-  const busy: [number, number][] = [];
+export function buildLocalPlan(p: Profile, taken: [number, number][] = []): PlanHabit[] {
+  const busy: [number, number][] = [...taken];
   const isFree = (start: number, len: number) =>
     start >= 0 &&
     start + len <= DAY &&
@@ -128,12 +115,8 @@ export function buildLocalPlan(p: Profile): PlanHabit[] {
   // Evening habits end by bedtime, or by 11:30 PM when bedtime is after midnight.
   const lateBed = bedtime < 12 * 60;
   const eveningEnd = lateBed ? 23 * 60 + 30 : bedtime;
-  const prime = PRIME_TIMES.find((t) => t.id === p.primeTime) ?? PRIME_TIMES[1];
-  // Workouts go outside the prime time, which is kept for work.
-  const workoutAt =
-    p.primeTime === 'evening' || p.primeTime === 'night' || p.primeTime === 'afternoon'
-      ? wake + 45
-      : 18 * 60;
+  // Early evening suits most people; Plan my day can move it.
+  const workoutAt = 18 * 60;
 
   const base = { target: 1, unit: null, onceDay: null, days: [] as number[] };
   const timed = (
@@ -175,7 +158,7 @@ export function buildLocalPlan(p: Profile): PlanHabit[] {
     durationMin: null,
   });
 
-  // The wake-up anchor and the work blocks are placed first so the rest fits around them.
+  // The wake-up anchor is placed first so the rest fits around it.
   const anchors: PlanHabit[] = [];
   if (p.goals.includes('wake')) {
     anchors.push(
@@ -188,29 +171,6 @@ export function buildLocalPlan(p: Profile): PlanHabit[] {
         'A fixed wake-up time anchors the rest of the day.',
       ),
     );
-  }
-  const workHours = p.workHours > 0 ? p.workHours : p.goals.includes('deep') ? 2 : 0;
-  const work: PlanHabit[] = [];
-  if (workHours > 0) {
-    const blocks = Math.min(4, Math.max(1, Math.ceil((workHours * 60) / 90)));
-    const len = Math.min(150, Math.max(30, Math.round((workHours * 60) / blocks / 15) * 15));
-    // Start earlier when all the blocks wouldn't fit before midnight.
-    let at = Math.min(prime.start, DAY - (blocks * len + (blocks - 1) * 15));
-    for (let i = 0; i < blocks; i++) {
-      const habit = timed(
-        blocks === 1 ? 'Deep work' : `Deep work · block ${i + 1}`,
-        'code-slash-outline',
-        at,
-        len,
-        3,
-        i === 0
-          ? `Your ${prime.label.toLowerCase()} focus time, ${workHours} h in ${blocks} block${blocks > 1 ? 's' : ''} with short breaks.`
-          : 'Next block after a short break.',
-        p.pace === 'all_in' ? [] : WEEKDAYS,
-      );
-      work.push(habit);
-      if (habit.startMinute !== null) at = habit.startMinute + len + 15;
-    }
   }
 
   // Everything else, most important first; the pace decides how many make the cut.
@@ -303,19 +263,29 @@ export function buildLocalPlan(p: Profile): PlanHabit[] {
             : timed(`Lights out by ${clock(bedtime)}`, 'moon-outline', bedtime, 15, 2, sleepWhy),
         );
         break;
-      case 'wake':
       case 'deep':
+        // No fixed time: Plan my day asks when and for how long.
+        rest.push(
+          anyTime('Deep work', 'code-slash-outline', 3, 'Pick when and how long in Plan my day.'),
+        );
+        break;
+      case 'wake':
         break;
     }
   }
 
-  const plan = [...anchors, ...work, ...rest.slice(0, size(4, 6, 9))];
+  const plan = [...anchors, ...rest.slice(0, size(4, 6, 9))];
   if (p.other.trim()) {
     plan.push({
       ...anyTime(p.other.trim().slice(0, 40), 'checkmark-circle-outline', 2, 'Something you asked for.'),
     });
   }
   return plan.sort((a, b) => (a.startMinute ?? DAY) - (b.startMinute ?? DAY));
+}
+
+// Just the habits for a body goal, fitted around times already in use.
+export function bodyGoalHabits(p: Profile, taken: [number, number][]) {
+  return buildLocalPlan({ ...p, goals: [], other: '' }, taken);
 }
 
 // Daily targets from the body goal. Only changed when a weight was given.

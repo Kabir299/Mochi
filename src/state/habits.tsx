@@ -126,7 +126,8 @@ function toRecordInput(input: HabitInput): db.HabitInput {
     repeat: input.repeat,
     weight: input.weight,
     start_minute: input.startMinute,
-    duration_min: input.startMinute === null ? null : input.durationMin,
+    // Kept for any-time tasks too, so Plan my day knows how long they take.
+    duration_min: input.durationMin,
     days: input.repeat === 'days' ? input.days.join(',') : null,
     once_day: input.repeat === 'once' ? input.onceDay : null,
     start_day: input.startDay ?? null,

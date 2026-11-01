@@ -39,6 +39,8 @@ export type Settings = {
   profile: string;
   // Ask for fingerprint / Face ID / passcode when the app opens.
   appLock: boolean;
+  // The Nutrition tab asked for a body goal (answered or "Not now").
+  bodyGoalAsked: boolean;
 };
 
 const DEFAULTS: Settings = {
@@ -58,6 +60,7 @@ const DEFAULTS: Settings = {
   onboarded: false,
   profile: '',
   appLock: false,
+  bodyGoalAsked: false,
 };
 
 type SettingsContextValue = Settings & {
@@ -93,6 +96,7 @@ function parse(raw: Record<string, string>): Settings {
     streakNudge: raw.streakNudge !== undefined ? raw.streakNudge === '1' : DEFAULTS.streakNudge,
     onboarded: raw.onboarded === '1',
     appLock: raw.appLock === '1',
+    bodyGoalAsked: raw.bodyGoalAsked === '1',
     profile: raw.profile ?? '',
   };
 }

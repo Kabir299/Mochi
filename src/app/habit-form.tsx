@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { closeModal } from '@/lib/nav';
 import { Segmented } from '@/components/Segmented';
 import { confirmDestructive } from '@/lib/confirm';
-import { HABIT_ICONS } from '@/lib/icons';
+import { guessIcon, HABIT_ICONS } from '@/lib/icons';
 import { formatDuration, formatMinute, fromDateKey, toDateKey } from '@/lib/dates';
 import { Habit, IconName, Repeat, useHabits } from '@/state/habits';
 import { colors, radius, spacing } from '@/theme';
@@ -71,6 +71,10 @@ const GOAL_OPTIONS = [
   ['check', 'Check off'],
   ['count', 'Count up'],
 ] as const;
+
+type Step = 'what' | 'when' | 'minutes' | 'full';
+const QUICK_STEPS: Step[] = ['what', 'when', 'minutes'];
+const QUICK_MINUTES = [5, 10, 15, 20, 30, 45, 60, 90, 120];
 
 // Waits for habits to load so the form's initial state comes from the saved
 // habit, even when opened by a link or after a reload.
@@ -130,6 +134,37 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
   const [daysError, setDaysError] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // New tasks are added one question at a time; editing shows everything at once.
+  const [step, setStep] = useState<Step>(existing ? 'full' : 'what');
+  const [iconPicked, setIconPicked] = useState(!!existing);
+  const [customMinutes, setCustomMinutes] = useState('');
+  const quick = step !== 'full';
+
+  const changeName = (text: string) => {
+    setName(text);
+    setError(null);
+    if (!iconPicked) setIcon(guessIcon(text));
+  };
+
+  // The Next button stays in place between steps, so a quick double tap would skip one.
+  const lastStepAt = useRef(0);
+  const nextStep = () => {
+    if (Date.now() - lastStepAt.current < 400) return;
+    lastStepAt.current = Date.now();
+    if (step === 'what') {
+      if (!name.trim()) {
+        setError('What do you want to do?');
+        return;
+      }
+      setStep('when');
+    } else if (step === 'when') {
+      if (repeat === 'days' && days.length === 0) {
+        setDaysError(true);
+        return;
+      }
+      setStep('minutes');
+    }
+  };
 
   const save = async () => {
     const trimmed = name.trim();
@@ -149,7 +184,8 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
       repeat,
       weight: Number(worth),
       startMinute: timeMode === 'timed' ? startMinute : null,
-      durationMin: timeMode === 'timed' ? durationMin : null,
+      // The quick flow always asks how long, which also helps Plan my day place it.
+      durationMin: timeMode === 'timed' || quick ? durationMin : null,
       days: [...days].sort(),
       // A one-off task is due today, or keeps its day when edited.
       onceDay: existing?.onceDay ?? forDay,
@@ -217,12 +253,219 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
           <Pressable onPress={() => closeModal()} hitSlop={12}>
             <Text style={styles.topAction}>Cancel</Text>
           </Pressable>
-          <Text style={styles.topTitle}>{existing ? 'Edit habit' : 'New habit'}</Text>
-          <Pressable onPress={save} disabled={saving} hitSlop={12}>
-            <Text style={[styles.topAction, styles.topSave]}>Save</Text>
-          </Pressable>
+          <Text style={styles.topTitle}>
+            {existing ? 'Edit habit' : quick ? 'New task' : 'New habit'}
+          </Text>
+          {quick ? (
+            <Text style={styles.topAction}>
+              {QUICK_STEPS.indexOf(step) + 1} of {QUICK_STEPS.length}
+            </Text>
+          ) : (
+            <Pressable onPress={save} disabled={saving} hitSlop={12}>
+              <Text style={[styles.topAction, styles.topSave]}>Save</Text>
+            </Pressable>
+          )}
         </View>
 
+        {quick ? (
+          <>
+            <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+              {otherDay && (
+                <View style={styles.dayBanner}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.accentLight} />
+                  <Text style={styles.dayBannerText}>Adding to {dayLabel}</Text>
+                </View>
+              )}
+
+              {step === 'what' && (
+                <View style={styles.field}>
+                  <Text style={styles.question}>What do you want to do?</Text>
+                  <View style={styles.nameRow}>
+                    <View style={styles.nameIcon}>
+                      <Ionicons name={icon} size={22} color={colors.accent} />
+                    </View>
+                    <TextInput
+                      value={name}
+                      onChangeText={changeName}
+                      placeholder="e.g. Read 20 pages"
+                      placeholderTextColor={colors.iconMuted}
+                      style={[styles.input, styles.flex, error && styles.inputError]}
+                      autoFocus
+                      maxLength={40}
+                      returnKeyType="next"
+                      onSubmitEditing={nextStep}
+                    />
+                  </View>
+                  {error && <Text style={styles.error}>{error}</Text>}
+                </View>
+              )}
+
+              {step === 'when' && (
+                <>
+                  <View style={styles.field}>
+                    <Text style={styles.question}>When?</Text>
+                    <Segmented options={TIME_OPTIONS} value={timeMode} onChange={setTimeMode} />
+                    {timeMode === 'timed' ? (
+                      <>
+                        <View style={styles.timeRow}>
+                          <Text style={styles.timeLabel}>Starts</Text>
+                          <Pressable
+                            onPress={() =>
+                              setStartMinute((m) => (m - TIME_STEP + DAY_MINUTES) % DAY_MINUTES)
+                            }
+                            style={styles.timeButton}
+                            accessibilityLabel="Earlier"
+                          >
+                            <Ionicons name="remove" size={20} color={colors.text} />
+                          </Pressable>
+                          <Pressable
+                            onPress={openTimePicker}
+                            accessibilityRole="button"
+                            accessibilityLabel="Pick a time"
+                          >
+                            <Text
+                              style={[styles.timeValue, Platform.OS !== 'web' && styles.timeTappable]}
+                            >
+                              {formatMinute(startMinute)}
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => setStartMinute((m) => (m + TIME_STEP) % DAY_MINUTES)}
+                            style={styles.timeButton}
+                            accessibilityLabel="Later"
+                          >
+                            <Ionicons name="add" size={20} color={colors.text} />
+                          </Pressable>
+                        </View>
+                        {iosPicker && Platform.OS === 'ios' && (
+                          <DateTimePicker
+                            value={minuteToDate(startMinute)}
+                            mode="time"
+                            display="spinner"
+                            themeVariant="dark"
+                            onChange={(_, date) => date && setStartMinute(dateToMinute(date))}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <Text style={styles.helper}>
+                        No fixed time. Plan my day can find a slot for it.
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.field}>
+                    <Text style={styles.label}>How often</Text>
+                    <Segmented options={REPEAT_OPTIONS} value={repeat} onChange={setRepeat} />
+                    {repeat === 'days' && (
+                      <View style={styles.weekdays}>
+                        {WEEKDAYS.map(([wd, letter, full]) => {
+                          const on = days.includes(wd);
+                          return (
+                            <Pressable
+                              key={wd}
+                              onPress={() => {
+                                setDays((prev) =>
+                                  on ? prev.filter((d) => d !== wd) : [...prev, wd],
+                                );
+                                setDaysError(false);
+                              }}
+                              style={[styles.weekday, on && styles.weekdayOn]}
+                              accessibilityRole="checkbox"
+                              accessibilityState={{ checked: on }}
+                              accessibilityLabel={full}
+                            >
+                              <Text style={[styles.weekdayText, on && styles.weekdayTextOn]}>
+                                {letter}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    )}
+                    {repeat === 'days' && daysError && (
+                      <Text style={styles.error}>Pick at least one day</Text>
+                    )}
+                  </View>
+                </>
+              )}
+
+              {step === 'minutes' && (
+                <View style={styles.field}>
+                  <Text style={styles.question}>How many minutes?</Text>
+                  <View style={styles.chips}>
+                    {QUICK_MINUTES.map((m) => {
+                      const on = m === durationMin && customMinutes === '';
+                      return (
+                        <Pressable
+                          key={m}
+                          onPress={() => {
+                            setDurationMin(m);
+                            setCustomMinutes('');
+                          }}
+                          style={[styles.chip, on && styles.chipOn]}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: on }}
+                        >
+                          <Text style={[styles.chipText, on && styles.chipTextOn]}>
+                            {formatDuration(m)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <TextInput
+                    value={customMinutes}
+                    onChangeText={(t) => {
+                      const clean = t.replace(/[^0-9]/g, '');
+                      setCustomMinutes(clean);
+                      const m = Number(clean);
+                      if (m >= 1 && m <= 720) setDurationMin(m);
+                    }}
+                    placeholder="Other: type minutes"
+                    placeholderTextColor={colors.iconMuted}
+                    keyboardType="number-pad"
+                    style={styles.input}
+                    maxLength={3}
+                  />
+                  <Text style={styles.helper}>
+                    {timeMode === 'timed'
+                      ? `${formatMinute(startMinute)} – ${formatMinute((startMinute + durationMin) % DAY_MINUTES)}`
+                      : `About ${formatDuration(durationMin)}, any time`}
+                    {repeat === 'once' ? ` · ${dayLabel}` : repeat === 'daily' ? ' · every day' : ''}
+                  </Text>
+                  {error && <Text style={styles.error}>{error}</Text>}
+                </View>
+              )}
+
+              <Pressable onPress={() => setStep('full')} hitSlop={8} style={styles.moreLink}>
+                <Text style={styles.moreText}>More options (worth, count goals, icon)</Text>
+              </Pressable>
+            </ScrollView>
+
+            <View style={styles.footer}>
+              {step !== 'what' && (
+                <Pressable
+                  onPress={() => setStep(step === 'minutes' ? 'when' : 'what')}
+                  style={styles.backButton}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.backText}>Back</Text>
+                </Pressable>
+              )}
+              <Pressable
+                onPress={() => {
+                  if (step !== 'minutes') nextStep();
+                  else if (Date.now() - lastStepAt.current >= 400) save();
+                }}
+                disabled={saving}
+                style={[styles.nextButton, saving && styles.disabled]}
+                accessibilityRole="button"
+              >
+                <Text style={styles.nextText}>{step === 'minutes' ? 'Add task' : 'Next'}</Text>
+              </Pressable>
+            </View>
+          </>
+        ) : (
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {otherDay && (
             <View style={styles.dayBanner}>
@@ -234,10 +477,7 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
             <Text style={styles.label}>Name</Text>
             <TextInput
               value={name}
-              onChangeText={(text) => {
-                setName(text);
-                setError(null);
-              }}
+              onChangeText={changeName}
               placeholder="Read 20 pages"
               placeholderTextColor={colors.iconMuted}
               style={[styles.input, error && styles.inputError]}
@@ -262,7 +502,10 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
                 return (
                   <Pressable
                     key={name}
-                    onPress={() => setIcon(name)}
+                    onPress={() => {
+                      setIcon(name);
+                      setIconPicked(true);
+                    }}
                     style={[styles.iconCell, selected && styles.iconCellSelected]}
                     accessibilityRole="button"
                     accessibilityState={{ selected }}
@@ -436,6 +679,7 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
             </Pressable>
           )}
         </ScrollView>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -681,5 +925,64 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: 16,
     fontWeight: '500',
+  },
+  question: {
+    color: colors.text,
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: spacing.xs,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  nameIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.pill,
+    backgroundColor: colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreLink: {
+    alignSelf: 'center',
+  },
+  moreText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    textDecorationLine: 'underline',
+  },
+  footer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    padding: spacing.lg + 4,
+    paddingTop: spacing.sm,
+  },
+  backButton: {
+    paddingVertical: spacing.md + 2,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.pill,
+    backgroundColor: colors.card,
+  },
+  backText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  nextButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.md + 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+  },
+  nextText: {
+    color: colors.onAccent,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  disabled: {
+    opacity: 0.5,
   },
 });

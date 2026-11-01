@@ -42,3 +42,4 @@ yarn-error.*
 
 # secrets (API keys live only here)
 .env
+expo-go-qr.png

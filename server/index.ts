@@ -125,9 +125,15 @@ const DayPlan = z.object({
       id: z.number().int().describe('The task id from the input.'),
       start_time: Time,
       duration_min: z.number().int(),
+      priority: z
+        .enum(['high', 'medium', 'low'])
+        .describe("The person's priority if they gave one, otherwise yours."),
       reason: z.string().describe('A few words on why this slot.'),
     }),
   ),
+  skipped: z
+    .array(z.object({ id: z.number().int(), reason: z.string() }))
+    .describe('Flexible tasks left out because they did not fit the window or the time budget.'),
   summary: z.string().describe('One sentence describing the shape of the day.'),
 });
 
@@ -200,10 +206,25 @@ const ROUTES: Record<string, Route> = {
     schema: DayPlan,
     system: `${COACH}
 
-You plan a day. Fixed tasks already have a start_time and must not move. Give every
-flexible task (start_time null) a start time after "now", avoiding overlaps with fixed
-tasks and with each other. Use the given duration, or estimate a sensible one. Put
-demanding tasks earlier, leave short breaks, and keep everything before 23:00.`,
+You plan a day. Fixed tasks already have a start_time and must not move. Place the
+flexible tasks (start_time null, not done) after "now", without overlapping fixed tasks
+or each other, with short breaks between them.
+
+The person told you:
+- work_window: when they want to do the flexible tasks. Keep every placed task inside it.
+  null means any time before 23:30.
+- time_budget_min: the total minutes they want to spend on all flexible tasks together.
+  The durations you give must add up to no more than this. null means no limit.
+- priority on each flexible task: "high", "medium" or "low", or null for you to decide.
+  When you decide, judge from the task name: work, study, health and deadlines usually
+  come before chores and leisure.
+
+Use each task's duration, or estimate a sensible one. Schedule high priority first and in
+the earliest good slot of the window. If everything doesn't fit the window or the budget,
+shorten lower-priority tasks first (never below 10 minutes), then leave the lowest-priority
+ones out and list them in "skipped" with a short, kind reason. Never skip a high-priority
+task while a lower one is placed. Every flexible task appears in either "plan" or
+"skipped", never both.`,
     prompt: (body) => `Plan my day.\n\n${JSON.stringify(body)}`,
   },
   '/chat': {
@@ -256,13 +277,12 @@ Rules:
     system: `${COACH}
 
 You design someone's first set of habits from their onboarding answers: the habits they
-want, their body goal, wake-up time, the part of the day they focus best (prime time),
-how many hours of focused work they want, and their pace. A draft made by simple rules is
-included; improve on it rather than starting over. Put focused work in their prime time
-and split it into blocks of 60–120 minutes with breaks. Keep timed habits from
-overlapping, all between their wake-up time and 23:30. Match the pace: "easy" means about
-4 small habits, "steady" about 6, "all_in" up to 9 (work blocks not counted). Cover the
-free-text request if there is one. Workouts and other body habits should suit the body goal.`,
+want, their wake-up time and their pace. A draft made by simple rules is included; improve
+on it rather than starting over. Keep timed habits from overlapping, all between their
+wake-up time and 23:30. Leave work and study habits (like deep work) without a start time:
+the person picks when and how long in Plan my day. Match the pace: "easy" means about 4
+small habits, "steady" about 6, "all_in" up to 9. Cover the free-text request if there is
+one.`,
     prompt: (body) => `Build my starting plan.\n\n${JSON.stringify(body)}`,
   },
 };
