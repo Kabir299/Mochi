@@ -8,6 +8,11 @@ Rough total: 2–3 sessions of work, ~$124 in store fees, and $0/month to start.
 
 ## Done (1 Nov 2026)
 
+- Code on GitHub (private): Kabir299/Mochi.
+- AI server hosted on Render (free): https://habit-tracker-ai-mec4.onrender.com. The app key
+  is in `.env` (local, not in git) and in EAS for all build profiles; set with
+  `scripts/set-ai-key.ps1`. Tested end to end from the app.
+
 - Git repository with a first commit; `.env` files are ignored.
 - App identity: name **Mochi**, bundle ID / package `com.mochihabits.app`, version 1.0.0.
 - App icon, Android adaptive + monochrome icon, splash screen, notification icon.
