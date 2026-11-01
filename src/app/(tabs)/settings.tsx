@@ -23,6 +23,7 @@ import { confirmDestructive } from '@/lib/confirm';
 import * as db from '@/lib/db';
 import { lockSupported, lockUnavailableReason, unlock } from '@/lib/lock';
 import { remindersSupported, requestReminderPermission } from '@/lib/reminders';
+import { useDayLogs } from '@/state/dayLogs';
 import { useHabits } from '@/state/habits';
 import { useNutrition } from '@/state/nutrition';
 import { FREE_LAUNCH, useSettings } from '@/state/settings';
@@ -46,6 +47,7 @@ export default function SettingsScreen() {
   const settings = useSettings();
   const { archivedHabits, archiveHabit, removeHabit, reload } = useHabits();
   const nutrition = useNutrition();
+  const dayLogs = useDayLogs();
   const [petName, setPetName] = useState(settings.petName);
 
   const exportData = async () => {
@@ -83,7 +85,7 @@ export default function SettingsScreen() {
     );
     if (!ok) return;
     await db.deleteAllData(database);
-    await Promise.all([reload(), nutrition.reload()]);
+    await Promise.all([reload(), nutrition.reload(), dayLogs.reload()]);
     // Back to the setup questions, like a fresh install.
     await settings.update({ petName: 'Mochi', onboarded: false });
     setPetName('Mochi');
@@ -169,6 +171,14 @@ export default function SettingsScreen() {
             onChange={async (v) => {
               const allowed = v ? await requestReminderPermission() : false;
               settings.update({ weeklyRecap: v && allowed });
+            }}
+          />
+          <ToggleRow
+            label="Evening recap at 9:30 PM"
+            value={settings.eveningRecap}
+            onChange={async (v) => {
+              const allowed = v ? await requestReminderPermission() : false;
+              settings.update({ eveningRecap: v && allowed });
             }}
           />
           {!remindersSupported && (

@@ -1,7 +1,8 @@
 import Constants from 'expo-constants';
 
 import { addDays, DateKey, lastNDays, toDateKey } from '@/lib/dates';
-import type { FoodLog } from '@/lib/db';
+import type { DayLog, FoodLog } from '@/lib/db';
+import { MOODS } from '@/lib/moods';
 import { purchaseUserId } from '@/lib/purchases';
 import { secureGet, secureSet } from '@/lib/secureStorage';
 import { habitStats } from '@/lib/stats';
@@ -23,6 +24,7 @@ export type Analysis = {
 
 const PERIOD_DAYS = 30;
 const NUTRITION_DAYS = 14;
+const RECAP_DAYS = 14;
 const REQUEST_TIMEOUT_MS = 120_000;
 const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -43,6 +45,8 @@ type PayloadInput = {
   streakFor: (habit: Habit, today: Date) => number;
   // Onboarding answers (goals, body goal, wake-up, prime time, work hours, pace).
   profile?: unknown;
+  // Evening recaps (mood and one line), when the person wrote any.
+  dayLogFor?: (day: DateKey) => DayLog | undefined;
   nutrition?: {
     waterGoalMl: number;
     calorieGoal: number;
@@ -76,6 +80,17 @@ export function buildPayload(input: PayloadInput) {
       const key = toDateKey(d);
       return { date: key, percent: percent(input.dayProgress(key)) };
     }),
+    // How days felt, so the analysis can link good days to what was done on them.
+    day_recaps: input.dayLogFor
+      ? lastNDays(today, RECAP_DAYS)
+          .map((d) => input.dayLogFor!(toDateKey(d)))
+          .filter((l): l is DayLog => l !== undefined)
+          .map((l) => ({
+            date: l.day,
+            felt: MOODS.find((m) => m.value === l.mood)?.label ?? null,
+            note: l.note,
+          }))
+      : undefined,
     habits: stats.map(({ habit, rate, previousRate }) => ({
       name: habit.name,
       goal: describeGoal(habit),

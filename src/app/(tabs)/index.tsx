@@ -24,10 +24,11 @@ import {
   fromDateKey,
   toDateKey,
 } from '@/lib/dates';
+import { DayCheck } from '@/components/DayCheck';
 import { cheer } from '@/lib/encouragement';
 import { useToday } from '@/lib/useToday';
 import { STARTER_HABITS } from '@/lib/starter';
-import { computeDayStreak } from '@/lib/streak';
+import { computeDayStreak, withRepairs } from '@/lib/streak';
 import { Habit, useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
 import { colors, radius, spacing } from '@/theme';
@@ -120,7 +121,7 @@ export default function TodayScreen() {
   const dayStreak = computeDayStreak(
     firstDay,
     today,
-    dayProgress,
+    withRepairs(dayProgress, settings.repairedDays),
     settings.streakThreshold,
     settings.freezesPerMonth,
   );
@@ -464,6 +465,7 @@ export default function TodayScreen() {
 
         {view === 'day' && dayHabits.length > 0 && (
           <>
+            {isToday && <DayCheck today={today} />}
             <View style={styles.progressCard}>
               <View style={styles.petRow}>
                 <Pressable

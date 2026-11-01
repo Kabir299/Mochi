@@ -41,6 +41,14 @@ export type Settings = {
   appLock: boolean;
   // The Nutrition tab asked for a body goal (answered or "Not now").
   bodyGoalAsked: boolean;
+  // Missed days brought back by finishing the next day at 100%, comma separated.
+  repairedDays: string;
+  // The missed day being repaired today, or ''.
+  repairPending: string;
+  // The last missed day whose card was answered or dismissed, so it shows once.
+  dayCheckSeen: string;
+  // 9:30 PM "how did today go?" notification.
+  eveningRecap: boolean;
 };
 
 const DEFAULTS: Settings = {
@@ -61,6 +69,10 @@ const DEFAULTS: Settings = {
   profile: '',
   appLock: false,
   bodyGoalAsked: false,
+  repairedDays: '',
+  repairPending: '',
+  dayCheckSeen: '',
+  eveningRecap: true,
 };
 
 type SettingsContextValue = Settings & {
@@ -97,6 +109,11 @@ function parse(raw: Record<string, string>): Settings {
     onboarded: raw.onboarded === '1',
     appLock: raw.appLock === '1',
     bodyGoalAsked: raw.bodyGoalAsked === '1',
+    repairedDays: raw.repairedDays ?? '',
+    repairPending: raw.repairPending ?? '',
+    dayCheckSeen: raw.dayCheckSeen ?? '',
+    eveningRecap:
+      raw.eveningRecap !== undefined ? raw.eveningRecap === '1' : DEFAULTS.eveningRecap,
     profile: raw.profile ?? '',
   };
 }

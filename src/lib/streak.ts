@@ -59,3 +59,52 @@ export function computeDayStreak(
     frozenDays,
   };
 }
+
+// Repairs allowed per month, on top of the automatic freezes.
+export const REPAIRS_PER_MONTH = 1;
+
+export const parseDays = (csv: string) => new Set(csv.split(',').filter(Boolean));
+
+// A repaired day counts as a kept day.
+export function withRepairs(
+  dayProgress: (day: DateKey) => number | null,
+  repairedCsv: string,
+): (day: DateKey) => number | null {
+  const repaired = parseDays(repairedCsv);
+  if (repaired.size === 0) return dayProgress;
+  return (day) => (repaired.has(day) ? 1 : dayProgress(day));
+}
+
+export type Yesterday =
+  | { kind: 'fine' }
+  // A freeze covered it; the streak lives on.
+  | { kind: 'frozen'; day: DateKey; streak: number; freezesLeft: number }
+  // The streak broke; it can be repaired if one is left this month.
+  | { kind: 'broken'; day: DateKey; lost: number; canRepair: boolean };
+
+// How yesterday went for the streak, so Today can say something kind about it.
+export function yesterdayStatus(
+  firstDay: DateKey | null,
+  today: Date,
+  dayProgress: (day: DateKey) => number | null,
+  repairedCsv: string,
+  threshold = STREAK_THRESHOLD,
+  freezesPerMonth = FREEZES_PER_MONTH,
+): Yesterday {
+  const day = toDateKey(addDays(today, -1));
+  const progress = withRepairs(dayProgress, repairedCsv);
+  const value = progress(day);
+  if (value === null || value >= threshold) return { kind: 'fine' };
+
+  const now = computeDayStreak(firstDay, today, progress, threshold, freezesPerMonth);
+  if (now.frozenDays.has(day)) {
+    return { kind: 'frozen', day, streak: now.current, freezesLeft: now.freezesLeft };
+  }
+  // The streak as it stood before yesterday (the day before counts as finished then).
+  const before = computeDayStreak(firstDay, addDays(today, -2), progress, threshold, freezesPerMonth);
+  const lost = before.current;
+  if (lost < 2) return { kind: 'fine' };
+  const month = day.slice(0, 7);
+  const usedThisMonth = [...parseDays(repairedCsv)].filter((d) => d.startsWith(month)).length;
+  return { kind: 'broken', day, lost, canRepair: usedThisMonth < REPAIRS_PER_MONTH };
+}

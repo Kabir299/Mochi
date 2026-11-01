@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
+import { router, type Href } from 'expo-router';
 
 import { toDateKey } from '@/lib/dates';
-import { syncReminders } from '@/lib/reminders';
+import { onReminderTap, syncReminders } from '@/lib/reminders';
 import { useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
 
@@ -20,7 +21,10 @@ export function ReminderSync() {
     settings.petName,
     settings.reminderLead,
     settings.weeklyRecap,
+    settings.eveningRecap,
   ]);
+
+  useEffect(() => onReminderTap((url) => router.push(url as Href)), []);
 
   useEffect(() => {
     if (!loaded || !settings.loaded) return;
@@ -32,6 +36,7 @@ export function ReminderSync() {
       petName: settings.petName,
       reminderLead: settings.reminderLead,
       weeklyRecap: settings.weeklyRecap,
+      eveningRecap: settings.eveningRecap,
     }).catch(() => {
       // Notifications are best effort; the app works without them.
     });
