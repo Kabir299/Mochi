@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Mochi",
-    "slug": "mochi-habits",
+    "slug": "mochi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -26,6 +26,10 @@
       "predictiveBackGestureEnabled": false,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
+      ],
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ]
     },
     "web": {
@@ -43,7 +47,12 @@
       ],
       "expo-status-bar",
       "expo-font",
-      ["expo-sqlite", { "useSQLCipher": true }],
+      [
+        "expo-sqlite",
+        {
+          "useSQLCipher": true
+        }
+      ],
       "@react-native-community/datetimepicker",
       "expo-sharing",
       [
@@ -72,6 +81,21 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "headers": {
+          "Cross-Origin-Embedder-Policy": "credentialless",
+          "Cross-Origin-Opener-Policy": "same-origin"
+        },
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "ec3c63b5-44a3-4e4b-b58a-bb70bcc78107"
+      }
+    },
+    "owner": "mochi1000"
   }
 }
