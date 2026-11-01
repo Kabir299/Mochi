@@ -144,15 +144,15 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: colors.danger,
+    backgroundColor: colors.accent,
   },
   nowLine: {
     flex: 1,
     height: 1.5,
-    backgroundColor: colors.danger,
+    backgroundColor: colors.accent,
   },
   nowText: {
-    color: colors.danger,
+    color: colors.accent,
     fontSize: 11,
     fontWeight: '600',
   },
