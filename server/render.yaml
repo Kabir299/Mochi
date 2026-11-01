@@ -14,5 +14,11 @@ services:
         sync: false
       - key: APP_KEY
         generateValue: true
+      - key: TOKEN_SECRET
+        generateValue: true
+      - key: REVENUECAT_SECRET_KEY
+        sync: false
+      - key: DAILY_LIMIT
+        value: "5000"
       - key: RATE_LIMIT
         value: "40"

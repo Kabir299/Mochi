@@ -1,5 +1,6 @@
+import { useCallback, useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
-import { SQLiteProvider } from 'expo-sqlite';
+import { SQLiteDatabase, SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -7,15 +8,38 @@ import { AppLock } from '@/components/AppLock';
 import { PurchasesSync } from '@/components/PurchasesSync';
 import { ReminderSync } from '@/components/ReminderSync';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/lib/db';
+import { applyKey, DbChoice, prepareDatabase } from '@/lib/secureDb';
 import { HabitsProvider } from '@/state/habits';
 import { NutritionProvider } from '@/state/nutrition';
 import { SettingsProvider } from '@/state/settings';
 import { colors } from '@/theme';
 
 export default function RootLayout() {
+  const [db, setDb] = useState<DbChoice | null>(null);
+
+  useEffect(() => {
+    prepareDatabase()
+      .then(setDb)
+      // Never leave a blank screen: fall back to the plain database.
+      .catch(() => setDb({ name: DATABASE_NAME, key: null }));
+  }, []);
+
+  // The key must be the very first statement on the connection.
+  const key = db?.key ?? null;
+  const onInit = useCallback(
+    async (database: SQLiteDatabase) => {
+      await applyKey(database, key);
+      await migrateDbIfNeeded(database);
+    },
+    [key],
+  );
+
+  // A split second while the key is read; the splash screen covers it.
+  if (!db) return null;
+
   return (
     <SafeAreaProvider>
-      <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrateDbIfNeeded}>
+      <SQLiteProvider databaseName={db.name} onInit={onInit}>
         <SettingsProvider>
           <HabitsProvider>
             <NutritionProvider>

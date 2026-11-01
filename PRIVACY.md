@@ -10,7 +10,8 @@ does with your information.
 
 Your habits, check-ins, notes, moods, focus time, water and food logs, setup answers (goals,
 body goal, weight if given, wake-up time, working hours) and settings are stored only on your
-device. We don't have a copy. Deleting the app, or using Settings → Delete all data, removes them.
+device, in an encrypted database whose key is kept in your phone's secure storage. We don't
+have a copy. Deleting the app, or using Settings → Delete all data, removes them.
 
 ## What is sent when you use AI features
 

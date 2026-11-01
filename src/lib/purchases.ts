@@ -26,7 +26,14 @@ export function configurePurchases() {
   configured = true;
 }
 
-export const hasPro = (info: CustomerInfo) => info.entitlements.active[ENTITLEMENT] !== undefined;
+// RevenueCat's anonymous id for this install, or null when payments are off.
+export async function purchaseUserId() {
+  if (!paymentsEnabled) return null;
+  configurePurchases();
+  return Purchases.getAppUserID().catch(() => null);
+}
+
+export const hasPro =(info: CustomerInfo) => info.entitlements.active[ENTITLEMENT] !== undefined;
 
 export async function loadPackages(): Promise<PurchasesPackage[]> {
   const offerings = await Purchases.getOfferings();

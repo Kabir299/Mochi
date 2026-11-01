@@ -11,7 +11,7 @@
 //   POST /brain-dump  free text              -> structured tasks
 //   POST /estimate-food  meal description    -> calories and protein
 //   POST /onboard-plan   first-launch answers -> a starting set of habits
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import http from 'node:http';
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -67,12 +67,24 @@ const COACH = `You are a supportive, practical habit coach inside a habit tracke
 Ground every statement in the data you were given; never invent numbers. Be warm but
 direct and keep things short. Suggestions should be small, specific and doable this
 week (habit stacking, shrinking the habit, changing the time of day, preparing the
-environment). Nutrition feedback is general wellness guidance, not medical advice.`;
+environment). Nutrition feedback is general wellness guidance, not medical advice.
+
+Tone: honest but encouraging, like a good friend who is also a coach.
+- Be truthful. If something is slipping, say so plainly with the number (e.g. "Reading
+  dropped to 30% this month, from 70%"). Never call a weak result good or hide a decline.
+- Never shame, guilt or lecture. No "you failed", "you should have", "disappointing".
+  Treat a miss as information about the plan, not about the person.
+- Pair every problem with a reason for hope and a next step: what is still working,
+  or how small the fix is.
+- Find genuine wins even in a hard month (showing up at all, one habit holding, a good
+  streak last week). Don't invent praise; if there is little to praise, praise the effort
+  of checking in.
+- End on something motivating and specific about the coming week.`;
 
 const Time = z.string().describe('24-hour local time, "HH:MM"');
 
 const Analysis = z.object({
-  summary: z.string().describe('Two or three sentences on overall progress and trend.'),
+  summary: z.string().describe('Two or three sentences on overall progress and trend: honest about the numbers, encouraging in tone.'),
   wins: z.array(z.string()).describe('Specific things going well, citing numbers.'),
   improvements: z
     .array(
@@ -262,7 +274,7 @@ function send(res: http.ServerResponse, status: number, body: unknown) {
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, x-app-key',
+    'Access-Control-Allow-Headers': 'Content-Type, x-app-key, x-install-token, x-user-id',
   });
   res.end(JSON.stringify(body));
 }
@@ -448,10 +460,67 @@ async function run(route: Route, body: Record<string, unknown>) {
 
 // Shared secret the app sends as x-app-key; unset means open (fine on home Wi-Fi).
 const APP_KEY = process.env.APP_KEY;
-// Per-address limit so one user (or a script) can't run up the AI bill.
+// Per-install limit so one user (or a script) can't run up the AI bill.
 const RATE_LIMIT = Number(process.env.RATE_LIMIT ?? 40);
+// Per-address limit, looser because many phones on mobile data share one address.
+const IP_RATE_LIMIT = Number(process.env.IP_RATE_LIMIT ?? 300);
+// New installs per address per hour; stops a script from minting endless passes.
+const REGISTER_LIMIT = Number(process.env.REGISTER_LIMIT ?? 10);
 const RATE_WINDOW_MS = 10 * 60_000;
+const HOUR_MS = 60 * 60_000;
 const recent = new Map<string, number[]>();
+
+// Each install gets its own signed pass from /register, so limits apply per install
+// and a pass can be revoked without touching the app. Signed with TOKEN_SECRET.
+const TOKEN_SECRET = process.env.TOKEN_SECRET;
+const sign = (id: string) =>
+  createHmac('sha256', TOKEN_SECRET!).update(id).digest('base64url');
+
+function newInstallToken() {
+  const id = randomUUID();
+  return `${id}.${sign(id)}`;
+}
+
+// Returns the install id if the pass is genuine, otherwise null.
+function installFrom(token: string | string[] | undefined) {
+  if (typeof token !== 'string') return null;
+  const [id, signature] = token.split('.');
+  if (!id || !signature) return null;
+  const expected = Buffer.from(sign(id));
+  const given = Buffer.from(signature);
+  return given.length === expected.length && timingSafeEqual(given, expected) ? id : null;
+}
+
+// Paid AI features. With REVENUECAT_SECRET_KEY set, the server asks RevenueCat whether
+// the caller really has Pro, so a modified app can't fake it.
+const PRO_ROUTES = new Set(['/analyze', '/plan-day', '/chat', '/estimate-food', '/brain-dump']);
+const REVENUECAT_SECRET_KEY = process.env.REVENUECAT_SECRET_KEY;
+const PRO_CACHE_MS = 10 * 60_000;
+const proCache = new Map<string, { pro: boolean; until: number }>();
+
+async function hasPro(userId: string) {
+  const cached = proCache.get(userId);
+  if (cached && cached.until > Date.now()) return cached.pro;
+  const response = await fetch(
+    `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(userId)}`,
+    {
+      headers: { Authorization: `Bearer ${REVENUECAT_SECRET_KEY}` },
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+  if (!response.ok) throw new ProviderError(503, 'Couldn’t check your Pro status. Try again.');
+  const data = (await response.json()) as {
+    subscriber?: { entitlements?: Record<string, { expires_date: string | null }> };
+  };
+  const entitlement = data.subscriber?.entitlements?.pro;
+  // No expiry date means a lifetime purchase.
+  const pro =
+    entitlement !== undefined &&
+    (entitlement.expires_date === null || Date.parse(entitlement.expires_date) > Date.now());
+  proCache.set(userId, { pro, until: Date.now() + PRO_CACHE_MS });
+  if (proCache.size > 50_000) proCache.clear();
+  return pro;
+}
 // Total AI calls per day across everyone, so a bug or attack can't run up a big bill.
 const DAILY_LIMIT = Number(process.env.DAILY_LIMIT ?? 5000);
 let today = '';
@@ -473,21 +542,21 @@ function keyMatches(sent: string | string[] | undefined) {
   return timingSafeEqual(hash(sent), hash(APP_KEY!));
 }
 
-// A public host must have APP_KEY, or anyone could use (and pay for) the AI.
-if (process.env.NODE_ENV === 'production' && !APP_KEY) {
-  console.error('APP_KEY is not set. Refusing to start in production without it.');
+// A public host must have both secrets, or anyone could use (and pay for) the AI.
+if (process.env.NODE_ENV === 'production' && (!APP_KEY || !TOKEN_SECRET)) {
+  console.error('APP_KEY and TOKEN_SECRET must be set. Refusing to start in production.');
   process.exit(1);
 }
 
-function allowRequest(ip: string) {
+function allowRequest(bucket: string, limit: number, windowMs = RATE_WINDOW_MS) {
   const now = Date.now();
-  const hits = (recent.get(ip) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
-  if (hits.length >= RATE_LIMIT) {
-    recent.set(ip, hits);
+  const hits = (recent.get(bucket) ?? []).filter((t) => now - t < windowMs);
+  if (hits.length >= limit) {
+    recent.set(bucket, hits);
     return false;
   }
   hits.push(now);
-  recent.set(ip, hits);
+  recent.set(bucket, hits);
   if (recent.size > 10_000) recent.clear();
   return true;
 }
@@ -495,8 +564,9 @@ function allowRequest(ip: string) {
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return send(res, 204, null);
   if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true });
+  const isRegister = req.method === 'POST' && req.url === '/register';
   const route = req.method === 'POST' && req.url ? ROUTES[req.url] : undefined;
-  if (!route) return send(res, 404, { error: 'Not found' });
+  if (!route && !isRegister) return send(res, 404, { error: 'Not found' });
 
   // Once hosted, only the app (which knows APP_KEY) may use the server.
   if (APP_KEY && !keyMatches(req.headers['x-app-key'])) {
@@ -507,8 +577,33 @@ const server = http.createServer(async (req, res) => {
     .split(',')
     .pop()!
     .trim();
-  if (!allowRequest(ip)) {
+
+  if (isRegister) {
+    if (!TOKEN_SECRET) return send(res, 200, { token: null });
+    if (!allowRequest(`register:${ip}`, REGISTER_LIMIT, HOUR_MS)) {
+      return send(res, 429, { error: 'Too many new installs from this network. Try later.' });
+    }
+    return send(res, 200, { token: newInstallToken() });
+  }
+
+  let install = 'local';
+  if (TOKEN_SECRET) {
+    const id = installFrom(req.headers['x-install-token']);
+    if (!id) return send(res, 401, { error: 'Please try again.', code: 'register' });
+    install = id;
+  }
+  if (!allowRequest(`install:${install}`, RATE_LIMIT) || !allowRequest(`ip:${ip}`, IP_RATE_LIMIT)) {
     return send(res, 429, { error: 'Too many AI requests. Try again in a few minutes.' });
+  }
+  if (REVENUECAT_SECRET_KEY && PRO_ROUTES.has(req.url!)) {
+    const userId = req.headers['x-user-id'];
+    try {
+      if (typeof userId !== 'string' || !(await hasPro(userId))) {
+        return send(res, 402, { error: 'This feature needs Mochi Pro.' });
+      }
+    } catch {
+      return send(res, 503, { error: 'Couldn’t check your Pro status. Try again.' });
+    }
   }
   if (!withinDailyBudget()) {
     return send(res, 503, { error: 'Mochi’s AI is very busy today. Try again tomorrow.' });
@@ -522,7 +617,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
-    send(res, 200, await run(route, await readJson(req)));
+    send(res, 200, await run(route!, await readJson(req)));
   } catch (error) {
     if (error instanceof ProviderError) {
       send(res, error.status, { error: error.message });

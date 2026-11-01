@@ -43,15 +43,25 @@ builds on your phone → friends testing → release. Details in the phases belo
 
 ## Security already in place
 
-- App lock with fingerprint / Face ID / PIN; the app is hidden in the app switcher.
-- All data stays on the phone; AI requests are not stored or logged by the server.
-- AI server: app key checked in constant time, per-person rate limit that can't be dodged by
-  faking an IP header, a daily cap on total AI calls (`DAILY_LIMIT`) to protect your bill,
-  200 KB request limit, no internal error details sent back, security headers, runs as a
-  non-root user, and refuses to start in production without `APP_KEY`.
+- **Encrypted database:** store builds encrypt all data with SQLCipher (256-bit). The key is
+  random per install and kept in the iOS Keychain / Android Keystore. Existing data is moved
+  into the encrypted file automatically on first launch. (Expo Go stays unencrypted; it
+  can't include SQLCipher.) Note: if a phone is restored from a backup without its
+  Keychain/Keystore, the old data can't be decrypted; the app starts fresh rather than
+  crash. Export my data is the backup until cloud sync exists.
+- **Optional app lock** (off by default) with fingerprint / Face ID / PIN; the app is hidden
+  in the app switcher.
+- **Per-install passes:** each install gets its own signed pass from `/register`
+  (`TOKEN_SECRET`), limited to 10 new installs per network per hour. Rate limits apply per
+  install, so pulling the app key out of the app is no longer enough to abuse the server.
+- **Server-side Pro check:** with `REVENUECAT_SECRET_KEY` set on Render, paid AI features ask
+  RevenueCat whether the caller really has Pro, so a modified app can't fake it.
+- AI requests are not stored or logged; daily cap on total AI calls (`DAILY_LIMIT`); 200 KB
+  request limit; timing-safe key checks; no internal error details; security headers;
+  non-root container; refuses to start in production without `APP_KEY` and `TOKEN_SECRET`.
 - Payments go through Apple / Google billing (RevenueCat); the app never handles card data.
-- Later, with accounts: verify Pro on the server (RevenueCat webhooks) so the AI limits per
-  plan can't be bypassed on a modified phone; consider an encrypted database (SQLCipher).
+- Still possible later: Play Integrity / App Attest, so only genuine store copies of the app
+  can get a pass (needs the store accounts).
 
 ---
 

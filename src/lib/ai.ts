@@ -2,6 +2,8 @@ import Constants from 'expo-constants';
 
 import { addDays, DateKey, lastNDays, toDateKey } from '@/lib/dates';
 import type { FoodLog } from '@/lib/db';
+import { purchaseUserId } from '@/lib/purchases';
+import { secureGet, secureSet } from '@/lib/secureStorage';
 import { habitStats } from '@/lib/stats';
 import type { Habit } from '@/state/habits';
 
@@ -103,17 +105,19 @@ export function buildPayload(input: PayloadInput) {
   };
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+const PASS_ID = 'mochi-ai-pass';
+
+async function send(path: string, body: unknown, headers: Record<string, string>) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  let response: Response;
   try {
-    response = await fetch(`${serverUrl()}${path}`, {
+    return await fetch(`${serverUrl()}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         // Must match APP_KEY on the hosted server; not needed for the local one.
         ...(process.env.EXPO_PUBLIC_APP_KEY ? { 'x-app-key': process.env.EXPO_PUBLIC_APP_KEY } : {}),
+        ...headers,
       },
       body: JSON.stringify(body),
       signal: controller.signal,
@@ -127,8 +131,35 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   } finally {
     clearTimeout(timer);
   }
+}
 
+// This install's signed pass from the server, kept in the Keychain / Keystore.
+async function installPass(renew = false) {
+  if (!renew) {
+    const saved = await secureGet(PASS_ID);
+    if (saved) return saved;
+  }
+  const response = await send('/register', {}, {});
   const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.error ?? 'Couldn’t connect to Mochi’s AI.');
+  // The local server hands out no pass; that's fine.
+  if (data?.token) await secureSet(PASS_ID, data.token);
+  return (data?.token as string | null) ?? '';
+}
+
+async function post<T>(path: string, body: unknown, renewed = false): Promise<T> {
+  const headers: Record<string, string> = {};
+  const pass = await installPass(renewed);
+  if (pass) headers['x-install-token'] = pass;
+  // Lets the server confirm Pro with RevenueCat instead of trusting the phone.
+  const userId = await purchaseUserId();
+  if (userId) headers['x-user-id'] = userId;
+
+  const response = await send(path, body, headers);
+  const data = await response.json().catch(() => null);
+  if (response.status === 401 && data?.code === 'register' && !renewed) {
+    return post<T>(path, body, true);
+  }
   if (!response.ok) {
     throw new Error(data?.error ?? `The AI server returned an error (${response.status}).`);
   }

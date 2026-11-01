@@ -21,13 +21,9 @@ const MIN_PILL = 46;
 const PX_PER_MIN = 1.6;
 const MAX_PILL = 150;
 
-// Soft colours handed out per habit so the day reads at a glance.
-const PILL_COLORS = ['#E8918A', '#7C9CC4', '#B56A8F', '#8FC77E', '#E3B262', '#9C8FD6', '#6FBFB5'];
-export const pillColor = (habit: Habit) => PILL_COLORS[habit.id % PILL_COLORS.length];
-
 const end = (h: Habit) => h.startMinute! + (h.durationMin ?? 0);
 
-// A visual plan of the day: a thin line with a coloured capsule per task, its
+// A visual plan of the day: a thin line with a capsule per task (grey, mint when done), its
 // height following the task's length, free time between tasks, and a "now" line.
 export function Timeline({ habits, isDone, nowMinute, renderRow }: Props) {
   const sorted = [...habits].sort((a, b) => a.startMinute! - b.startMinute!);
@@ -60,11 +56,15 @@ export function Timeline({ habits, isDone, nowMinute, renderRow }: Props) {
                 <View
                   style={[
                     styles.pill,
-                    { height, backgroundColor: pillColor(habit) },
+                    { height },
                     done && styles.pillDone,
                   ]}
                 >
-                  <Ionicons name={done ? 'checkmark' : habit.icon} size={20} color="#FFFFFF" />
+                  <Ionicons
+                    name={done ? 'checkmark' : habit.icon}
+                    size={20}
+                    color={done ? colors.onAccent : colors.text}
+                  />
                 </View>
               </View>
               <View style={styles.content}>{renderRow(habit, height)}</View>
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   },
   railLine: {
     width: 2,
-    backgroundColor: '#4A3A3A',
+    backgroundColor: colors.border,
   },
   // The line runs behind every capsule, top to bottom, so the day reads as one track.
   railBehind: {
@@ -110,11 +110,12 @@ const styles = StyleSheet.create({
   pill: {
     width: PILL_WIDTH,
     borderRadius: radius.pill,
+    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   pillDone: {
-    opacity: 0.55,
+    backgroundColor: colors.accent,
   },
   content: {
     flex: 1,
