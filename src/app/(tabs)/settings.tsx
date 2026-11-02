@@ -5,7 +5,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Switch,
   Text,
@@ -22,10 +21,12 @@ import { Segmented } from '@/components/Segmented';
 import { confirmDestructive } from '@/lib/confirm';
 import * as db from '@/lib/db';
 import { lockSupported, lockUnavailableReason, unlock } from '@/lib/lock';
+import { saveBackup } from '@/lib/backup';
 import { remindersSupported, requestReminderPermission } from '@/lib/reminders';
 import { useHabits } from '@/state/habits';
 import { useNutrition } from '@/state/nutrition';
 import { FREE_LAUNCH, useSettings } from '@/state/settings';
+import { useRestoreBackup } from '@/state/useRestoreBackup';
 import { colors, radius, spacing } from '@/theme';
 
 const THRESHOLDS = [
@@ -58,19 +59,20 @@ export default function SettingsScreen() {
   const nutrition = useNutrition();
   const [petName, setPetName] = useState(settings.petName);
 
-  const exportData = async () => {
-    const json = JSON.stringify(await db.exportAll(database), null, 2);
-    if (Platform.OS === 'web') {
-      // Browsers can't share text files, so download it instead.
-      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'habit-tracker-export.json';
-      link.click();
-      URL.revokeObjectURL(url);
-      return;
+  const restoreBackup = useRestoreBackup();
+
+  const backUp = async () => {
+    try {
+      await saveBackup(database);
+    } catch {
+      Alert.alert('Backup failed', 'Please try again.');
     }
-    await Share.share({ message: json, title: 'Habit tracker export' });
+  };
+
+  const restore = async () => {
+    if (await restoreBackup()) {
+      setPetName((await db.getSettings(database)).petName || 'Mochi');
+    }
   };
 
   const toggleLock = async (on: boolean) => {
@@ -259,7 +261,15 @@ export default function SettingsScreen() {
           {!FREE_LAUNCH && (
             <LinkRow icon="diamond-outline" label="Pro" onPress={() => router.push('/pro')} />
           )}
-          <LinkRow icon="share-outline" label="Export my data" onPress={exportData} />
+        </Section>
+
+        <Section title="Backup">
+          <Text style={styles.label}>
+            Your habits live only on this phone. Save a backup file to Drive, iCloud or a chat
+            with yourself, then restore it on your next phone.
+          </Text>
+          <LinkRow icon="cloud-upload-outline" label="Save a backup" onPress={backUp} />
+          <LinkRow icon="cloud-download-outline" label="Restore from a backup" onPress={restore} />
         </Section>
 
         <Section title="Archived habits">
@@ -341,7 +351,8 @@ function LinkRow({
   icon: | 'compass-outline'
     | 'albums-outline'
     | 'diamond-outline'
-    | 'share-outline'
+    | 'cloud-upload-outline'
+    | 'cloud-download-outline'
     | 'shield-checkmark-outline';
   label: string;
   onPress: () => void;

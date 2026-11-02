@@ -13,6 +13,10 @@ wake-up time, pace), body goal and weight if given, and settings are stored only
 device, in an encrypted database whose key is kept in your phone's secure storage. We don't
 have a copy. Deleting the app, or using Settings → Delete all data, removes them.
 
+Settings → Save a backup creates a file with this data that you keep wherever you choose
+(for example Google Drive, iCloud or a chat with yourself) to restore on a new phone. The
+file is not encrypted and is never sent to us.
+
 ## What is sent when you use AI features
 
 AI features (setup plan, analysis, coach, plan my day, brain dump, food estimates) only run

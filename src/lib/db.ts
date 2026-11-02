@@ -339,16 +339,119 @@ export async function setSortOrders(db: SQLiteDatabase, ids: number[]) {
   });
 }
 
-// Everything the user has entered, for export.
-export async function exportAll(db: SQLiteDatabase) {
+type Row = Record<string, string | number | null>;
+
+export type Backup = {
+  app: 'mochi';
+  version: number;
+  exported_at: string;
+  habits: Row[];
+  logs: Row[];
+  water: Row[];
+  food: Row[];
+  settings: Row[];
+};
+
+// Everything the user has entered: the export, and the backup file for a new phone.
+export async function exportAll(db: SQLiteDatabase): Promise<Backup> {
   const [habits, logs, water, food, settings] = await Promise.all([
-    db.getAllAsync('SELECT * FROM habits'),
-    db.getAllAsync('SELECT * FROM logs'),
-    db.getAllAsync('SELECT * FROM water_logs'),
-    db.getAllAsync('SELECT * FROM food_logs'),
-    db.getAllAsync('SELECT * FROM settings'),
+    db.getAllAsync<Row>('SELECT * FROM habits'),
+    db.getAllAsync<Row>('SELECT * FROM logs'),
+    db.getAllAsync<Row>('SELECT * FROM water_logs'),
+    db.getAllAsync<Row>('SELECT * FROM food_logs'),
+    db.getAllAsync<Row>('SELECT * FROM settings'),
   ]);
-  return { exported_at: new Date().toISOString(), habits, logs, water, food, settings };
+  return {
+    app: 'mochi',
+    version: DATABASE_VERSION,
+    exported_at: new Date().toISOString(),
+    habits,
+    logs,
+    water,
+    food,
+    settings,
+  };
+}
+
+const BACKUP_TABLES = [
+  ['habits', 'habits'],
+  ['logs', 'logs'],
+  ['water', 'water_logs'],
+  ['food', 'food_logs'],
+  ['settings', 'settings'],
+] as const;
+
+// Belong to this phone, not the person: Pro comes from the store account, the lock
+// and reminders need this phone's own permission.
+const DEVICE_SETTINGS = new Set(['isPro', 'appLock', 'remindersOn']);
+
+const isRow = (row: unknown): row is Row =>
+  typeof row === 'object' &&
+  row !== null &&
+  !Array.isArray(row) &&
+  Object.values(row).every((v) => v === null || typeof v === 'string' || typeof v === 'number');
+
+// Checks a backup file before anything on the phone is touched. Throws a message
+// fit to show the person when it isn't one.
+export function parseBackup(text: string): Backup {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error('That file isn’t a Mochi backup.');
+  }
+  const d = data as Partial<Backup> | null;
+  if (!d || !Array.isArray(d.habits) || !Array.isArray(d.logs)) {
+    throw new Error('That file isn’t a Mochi backup.');
+  }
+  if (typeof d.version === 'number' && d.version > DATABASE_VERSION) {
+    throw new Error('This backup is from a newer version of Mochi. Update the app and try again.');
+  }
+  const backup = {
+    app: 'mochi' as const,
+    version: typeof d.version === 'number' ? d.version : 0,
+    exported_at: typeof d.exported_at === 'string' ? d.exported_at : '',
+    habits: d.habits,
+    logs: d.logs,
+    water: d.water ?? [],
+    food: d.food ?? [],
+    settings: d.settings ?? [],
+  };
+  for (const [key] of BACKUP_TABLES) {
+    if (!Array.isArray(backup[key]) || !backup[key].every(isRow)) {
+      throw new Error('This backup file is damaged.');
+    }
+  }
+  return backup;
+}
+
+// Replaces everything on this phone with the backup, all or nothing. Columns the
+// backup doesn't have keep their defaults, so older backups restore too.
+export async function restoreAll(db: SQLiteDatabase, backup: Backup) {
+  await db.withTransactionAsync(async () => {
+    for (const [key, table] of BACKUP_TABLES) {
+      const columns = new Set(
+        (await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`)).map((c) => c.name),
+      );
+      if (table === 'settings') {
+        await db.runAsync(
+          `DELETE FROM settings WHERE key NOT IN (${[...DEVICE_SETTINGS].map(() => '?').join(', ')})`,
+          [...DEVICE_SETTINGS],
+        );
+      } else {
+        await db.runAsync(`DELETE FROM ${table}`);
+      }
+      for (const row of backup[key]) {
+        if (table === 'settings' && DEVICE_SETTINGS.has(String(row.key))) continue;
+        const names = Object.keys(row).filter((name) => columns.has(name));
+        if (names.length === 0) continue;
+        await db.runAsync(
+          `INSERT OR REPLACE INTO ${table} (${names.join(', ')}) VALUES (${names.map(() => '?').join(', ')})`,
+          names.map((name) => row[name]),
+        );
+      }
+    }
+  });
 }
 
 // Wipes all data. The starter set is not re-added.

@@ -33,6 +33,7 @@ import { remindersSupported, requestReminderPermission } from '@/lib/reminders';
 import { STARTER_HABITS } from '@/lib/starter';
 import { IconName, useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
+import { useRestoreBackup } from '@/state/useRestoreBackup';
 import { colors, radius, spacing } from '@/theme';
 
 const WAKE_TIMES = [300, 330, 360, 390, 420, 450, 480, 540, 600];
@@ -58,6 +59,7 @@ export default function OnboardingScreen() {
   const [aiError, setAiError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [remind, setRemind] = useState(remindersSupported);
+  const restoreBackup = useRestoreBackup();
 
   const set = (patch: Partial<Profile>) => setProfile((p) => ({ ...p, ...patch }));
   const leave = () => {
@@ -145,6 +147,12 @@ export default function OnboardingScreen() {
     leave();
   };
 
+  const restore = async () => {
+    if (!(await restoreBackup())) return;
+    await settings.update({ onboarded: true });
+    leave();
+  };
+
   const skip = async () => {
     if (habits.length === 0) for (const habit of STARTER_HABITS) await addHabit(habit);
     await settings.update({ onboarded: true });
@@ -188,6 +196,11 @@ export default function OnboardingScreen() {
               Answer a few quick questions and I’ll build your first plan around your goals.
             </Text>
             <PrivacyNote text={PRIVACY_SHORT} />
+            {!redo && (
+              <Pressable onPress={restore} hitSlop={8} accessibilityRole="button">
+                <Text style={styles.restore}>New phone? Restore a backup</Text>
+              </Pressable>
+            )}
           </View>
         )}
 
@@ -438,6 +451,12 @@ const styles = StyleSheet.create({
   skip: {
     color: colors.textMuted,
     fontSize: 15,
+  },
+  restore: {
+    color: colors.accent,
+    fontSize: 15,
+    fontWeight: '500',
+    marginTop: spacing.sm,
   },
   content: {
     padding: spacing.lg + 4,

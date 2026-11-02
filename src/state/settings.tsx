@@ -78,6 +78,8 @@ const DEFAULTS: Settings = {
 type SettingsContextValue = Settings & {
   loaded: boolean;
   update: (patch: Partial<Settings>) => Promise<void>;
+  // Re-reads everything, e.g. after a backup is restored.
+  reload: () => Promise<void>;
 };
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -134,6 +136,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
   }, [database]);
 
+  const reload = useCallback(async () => {
+    setSettings(parse(await db.getSettings(database)));
+  }, [database]);
+
   const update = useCallback(
     async (patch: Partial<Settings>) => {
       setSettings((prev) => ({ ...prev, ...patch }));
@@ -145,7 +151,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [database],
   );
 
-  const value = useMemo(() => ({ ...settings, loaded, update }), [settings, loaded, update]);
+  const value = useMemo(
+    () => ({ ...settings, loaded, update, reload }),
+    [settings, loaded, update, reload],
+  );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }
