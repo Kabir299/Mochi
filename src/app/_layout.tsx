@@ -62,7 +62,6 @@ export default function RootLayout() {
                 <Stack.Screen name="focus" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="note" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="coach" options={{ presentation: 'modal' }} />
-                <Stack.Screen name="brain-dump" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="plan-day" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="pet" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="share-card" options={{ presentation: 'modal' }} />

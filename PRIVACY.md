@@ -19,7 +19,7 @@ file is not encrypted and is never sent to us.
 
 ## What is sent when you use AI features
 
-AI features (setup plan, analysis, coach, plan my day, brain dump, food estimates) only run
+AI features (setup plan, analysis, coach, plan my day, food estimates) only run
 when you tap them. The app then sends a summary to our AI server: habit names, completion
 percentages, streaks, the text you typed, your setup answers and, if you log them, daily
 water, calorie and protein totals. It does not send your name, contacts, location or device

@@ -290,11 +290,6 @@ export default function TodayScreen() {
       label: 'Plan my day',
       onPress: () => router.push({ pathname: '/plan-day', params: { day: selected } }),
     },
-    {
-      icon: 'mic-outline',
-      label: 'Brain dump into tasks',
-      onPress: () => router.push({ pathname: '/brain-dump', params: { day: selected } }),
-    },
   ];
 
   const row = (habit: Habit, minHeight?: number, variant?: 'card' | 'timeline') => {

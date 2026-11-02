@@ -39,8 +39,8 @@ const FEATURES: { icon: IconName; title: string; body: string }[] = [
   },
   {
     icon: 'mic-outline',
-    title: 'Brain dump, plan my day and coach',
-    body: 'Say your day out loud and get a timed plan; chat with a coach who knows your habits.',
+    title: 'Plan my day and coach',
+    body: 'Say what’s on your mind and get a timed plan; chat with a coach who knows your habits.',
   },
   {
     icon: 'bed-outline',
