@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState } from "react";
 import {
   Alert,
   Linking,
@@ -10,44 +10,49 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useSQLiteContext } from 'expo-sqlite';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { useSQLiteContext } from "expo-sqlite";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { PRIVACY_SHORT } from '@/components/PrivacyNote';
-import { Segmented } from '@/components/Segmented';
-import { confirmDestructive } from '@/lib/confirm';
-import * as db from '@/lib/db';
-import { lockSupported, lockUnavailableReason, unlock } from '@/lib/lock';
-import { saveBackup } from '@/lib/backup';
-import { remindersSupported, requestReminderPermission } from '@/lib/reminders';
-import { useHabits } from '@/state/habits';
-import { useNutrition } from '@/state/nutrition';
-import { FREE_LAUNCH, useSettings } from '@/state/settings';
-import { useRestoreBackup } from '@/state/useRestoreBackup';
-import { colors, radius, spacing } from '@/theme';
+import { PRIVACY_SHORT } from "@/components/PrivacyNote";
+import { Segmented } from "@/components/Segmented";
+import { confirmDestructive } from "@/lib/confirm";
+import * as db from "@/lib/db";
+import { lockSupported, lockUnavailableReason, unlock } from "@/lib/lock";
+import { saveBackup } from "@/lib/backup";
+import {
+  allowExactTiming,
+  remindersSupported,
+  requestReminderPermission,
+} from "@/lib/reminders";
+import { useHabits } from "@/state/habits";
+import { useNutrition } from "@/state/nutrition";
+import { FREE_LAUNCH, useSettings } from "@/state/settings";
+import { useExactTiming } from "@/state/useExactTiming";
+import { useRestoreBackup } from "@/state/useRestoreBackup";
+import { colors, radius, spacing } from "@/theme";
 
 const THRESHOLDS = [
-  ['0.6', '60%'],
-  ['0.7', '70%'],
-  ['0.8', '80%'],
-  ['0.9', '90%'],
-  ['1', '100%'],
+  ["0.6", "60%"],
+  ["0.7", "70%"],
+  ["0.8", "80%"],
+  ["0.9", "90%"],
+  ["1", "100%"],
 ] as const;
 type Threshold = (typeof THRESHOLDS)[number][0];
 
 const MAX_FREEZES = 5;
 // Monday first; values are JS weekdays (0 = Sunday).
 const WEEKDAYS = [
-  [1, 'Mon'],
-  [2, 'Tue'],
-  [3, 'Wed'],
-  [4, 'Thu'],
-  [5, 'Fri'],
-  [6, 'Sat'],
-  [0, 'Sun'],
+  [1, "Mon"],
+  [2, "Tue"],
+  [3, "Wed"],
+  [4, "Thu"],
+  [5, "Fri"],
+  [6, "Sat"],
+  [0, "Sun"],
 ] as const;
 // Set once PRIVACY.md is hosted (e.g. on GitHub Pages).
 const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL;
@@ -60,18 +65,21 @@ export default function SettingsScreen() {
   const [petName, setPetName] = useState(settings.petName);
 
   const restoreBackup = useRestoreBackup();
+  const exactTiming = useExactTiming();
+  const anyReminder =
+    settings.remindersOn || settings.streakNudge || settings.weeklyRecap;
 
   const backUp = async () => {
     try {
       await saveBackup(database);
     } catch {
-      Alert.alert('Backup failed', 'Please try again.');
+      Alert.alert("Backup failed", "Please try again.");
     }
   };
 
   const restore = async () => {
     if (await restoreBackup()) {
-      setPetName((await db.getSettings(database)).petName || 'Mochi');
+      setPetName((await db.getSettings(database)).petName || "Mochi");
     }
   };
 
@@ -79,35 +87,40 @@ export default function SettingsScreen() {
     // Prove it works before turning it on, so nobody locks themselves out.
     const problem = on ? await lockUnavailableReason() : null;
     if (problem) {
-      Alert.alert('App lock', problem);
+      Alert.alert("App lock", problem);
       return;
     }
-    if (await unlock(on ? 'Turn on app lock' : 'Turn off app lock')) {
+    if (await unlock(on ? "Turn on app lock" : "Turn off app lock")) {
       settings.update({ appLock: on });
     }
   };
 
   const resetAll = async () => {
     const ok = await confirmDestructive(
-      'Delete all data?',
-      'Every habit, check-in, note, water and food log will be erased from this phone. This can’t be undone.',
-      'Delete everything',
+      "Delete all data?",
+      "Every habit, check-in, note, water and food log will be erased from this phone. This can’t be undone.",
+      "Delete everything",
     );
     if (!ok) return;
     await db.deleteAllData(database);
     await Promise.all([reload(), nutrition.reload()]);
     // Back to the setup questions, like a fresh install.
-    await settings.update({ petName: 'Mochi', onboarded: false });
-    setPetName('Mochi');
+    await settings.update({ petName: "Mochi", onboarded: false });
+    setPetName("Mochi");
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <Text style={styles.title}>Settings</Text>
 
         <Section title="Streak">
-          <Text style={styles.label}>Daily progress needed to keep the streak</Text>
+          <Text style={styles.label}>
+            Daily progress needed to keep the streak
+          </Text>
           <Segmented
             options={THRESHOLDS}
             value={String(settings.streakThreshold) as Threshold}
@@ -118,7 +131,9 @@ export default function SettingsScreen() {
             <Stepper
               value={settings.freezesPerMonth}
               onChange={(v) =>
-                settings.update({ freezesPerMonth: Math.min(MAX_FREEZES, Math.max(0, v)) })
+                settings.update({
+                  freezesPerMonth: Math.min(MAX_FREEZES, Math.max(0, v)),
+                })
               }
             />
           </View>
@@ -128,32 +143,39 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.leadRow}>
             {WEEKDAYS.map(([wd, label]) => {
-              const rest = settings.restDays.split(',').filter(Boolean).map(Number);
+              const rest = settings.restDays
+                .split(",")
+                .filter(Boolean)
+                .map(Number);
               const on = settings.isPro && rest.includes(wd);
               return (
                 <Pressable
                   key={wd}
                   onPress={() => {
                     if (!settings.isPro) {
-                      router.push('/pro');
+                      router.push("/pro");
                       return;
                     }
-                    const next = on ? rest.filter((d) => d !== wd) : [...rest, wd];
-                    settings.update({ restDays: next.join(',') });
+                    const next = on
+                      ? rest.filter((d) => d !== wd)
+                      : [...rest, wd];
+                    settings.update({ restDays: next.join(",") });
                   }}
                   style={[styles.leadChip, on && styles.leadChipOn]}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: on }}
                 >
-                  <Text style={[styles.leadText, on && styles.leadTextOn]}>{label}</Text>
+                  <Text style={[styles.leadText, on && styles.leadTextOn]}>
+                    {label}
+                  </Text>
                 </Pressable>
               );
             })}
           </View>
           <Text style={styles.hint}>
             {settings.isPro
-              ? 'Skipping these days won’t break your streak. Doing them still counts.'
-              : 'Take a day off without losing your streak. Part of Pro.'}
+              ? "Skipping these days won’t break your streak. Doing them still counts."
+              : "Take a day off without losing your streak. Part of Pro."}
           </Text>
         </Section>
 
@@ -162,7 +184,9 @@ export default function SettingsScreen() {
           <TextInput
             value={petName}
             onChangeText={setPetName}
-            onBlur={() => settings.update({ petName: petName.trim() || 'Mochi' })}
+            onBlur={() =>
+              settings.update({ petName: petName.trim() || "Mochi" })
+            }
             placeholder="Mochi"
             placeholderTextColor={colors.iconMuted}
             style={styles.input}
@@ -193,7 +217,7 @@ export default function SettingsScreen() {
                     accessibilityState={{ selected: on }}
                   >
                     <Text style={[styles.leadText, on && styles.leadTextOn]}>
-                      {m === 0 ? 'At start' : `${m} min before`}
+                      {m === 0 ? "At start" : `${m} min before`}
                     </Text>
                   </Pressable>
                 );
@@ -216,11 +240,26 @@ export default function SettingsScreen() {
               settings.update({ weeklyRecap: v && allowed });
             }}
           />
+          {anyReminder && !exactTiming && (
+            <View style={styles.warnBox}>
+              <Text style={styles.label}>
+                Android may send reminders up to half an hour late to save
+                battery.
+              </Text>
+              <Pressable
+                onPress={allowExactTiming}
+                hitSlop={8}
+                accessibilityRole="button"
+              >
+                <Text style={styles.warnLink}>Send them on time</Text>
+              </Pressable>
+            </View>
+          )}
           {!remindersSupported && (
             <Text style={styles.label}>
-              {Platform.OS === 'web'
-                ? 'Reminders only work in the phone app.'
-                : 'Reminders need the full app build on Android. They don’t run inside Expo Go.'}
+              {Platform.OS === "web"
+                ? "Reminders only work in the phone app."
+                : "Reminders need the full app build on Android. They don’t run inside Expo Go."}
             </Text>
           )}
         </Section>
@@ -228,8 +267,8 @@ export default function SettingsScreen() {
         <Section title="Privacy & security">
           <Text style={styles.privacy}>{PRIVACY_SHORT}</Text>
           <Text style={styles.privacy}>
-            No accounts, ads or tracking. Mochi gives general wellness tips, not medical advice;
-            calorie and protein numbers are estimates.
+            No accounts, ads or tracking. Mochi gives general wellness tips, not
+            medical advice; calorie and protein numbers are estimates.
           </Text>
           {lockSupported && (
             <ToggleRow
@@ -251,30 +290,44 @@ export default function SettingsScreen() {
           <LinkRow
             icon="compass-outline"
             label="Redo setup questions"
-            onPress={() => router.push('/onboarding?redo=1')}
+            onPress={() => router.push("/onboarding?redo=1")}
           />
           <LinkRow
             icon="albums-outline"
             label="Habit templates"
-            onPress={() => router.push('/templates')}
+            onPress={() => router.push("/templates")}
           />
           {!FREE_LAUNCH && (
-            <LinkRow icon="diamond-outline" label="Pro" onPress={() => router.push('/pro')} />
+            <LinkRow
+              icon="diamond-outline"
+              label="Pro"
+              onPress={() => router.push("/pro")}
+            />
           )}
         </Section>
 
         <Section title="Backup">
           <Text style={styles.label}>
-            Your habits live only on this phone. Save a backup file to Drive, iCloud or a chat
-            with yourself, then restore it on your next phone.
+            Your habits live only on this phone. Save a backup file to Drive,
+            iCloud or a chat with yourself, then restore it on your next phone.
           </Text>
-          <LinkRow icon="cloud-upload-outline" label="Save a backup" onPress={backUp} />
-          <LinkRow icon="cloud-download-outline" label="Restore from a backup" onPress={restore} />
+          <LinkRow
+            icon="cloud-upload-outline"
+            label="Save a backup"
+            onPress={backUp}
+          />
+          <LinkRow
+            icon="cloud-download-outline"
+            label="Restore from a backup"
+            onPress={restore}
+          />
         </Section>
 
         <Section title="Archived habits">
           {archivedHabits.length === 0 && (
-            <Text style={styles.label}>Archived habits keep their history and show up here.</Text>
+            <Text style={styles.label}>
+              Archived habits keep their history and show up here.
+            </Text>
           )}
           {archivedHabits.map((habit) => (
             <View key={habit.id} style={styles.row}>
@@ -282,22 +335,29 @@ export default function SettingsScreen() {
               <Text style={styles.rowText} numberOfLines={1}>
                 {habit.name}
               </Text>
-              <Pressable onPress={() => archiveHabit(habit.id, false)} hitSlop={8}>
+              <Pressable
+                onPress={() => archiveHabit(habit.id, false)}
+                hitSlop={8}
+              >
                 <Text style={styles.link}>Restore</Text>
               </Pressable>
               <Pressable
                 onPress={async () => {
                   const ok = await confirmDestructive(
                     `Delete "${habit.name}"?`,
-                    'Its history will be deleted too.',
-                    'Delete',
+                    "Its history will be deleted too.",
+                    "Delete",
                   );
                   if (ok) await removeHabit(habit.id);
                 }}
                 hitSlop={8}
                 accessibilityLabel={`Delete ${habit.name}`}
               >
-                <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                <Ionicons
+                  name="trash-outline"
+                  size={18}
+                  color={colors.danger}
+                />
               </Pressable>
             </View>
           ))}
@@ -348,12 +408,13 @@ function LinkRow({
   label,
   onPress,
 }: {
-  icon: | 'compass-outline'
-    | 'albums-outline'
-    | 'diamond-outline'
-    | 'cloud-upload-outline'
-    | 'cloud-download-outline'
-    | 'shield-checkmark-outline';
+  icon:
+    | "compass-outline"
+    | "albums-outline"
+    | "diamond-outline"
+    | "cloud-upload-outline"
+    | "cloud-download-outline"
+    | "shield-checkmark-outline";
   label: string;
   onPress: () => void;
 }) {
@@ -366,7 +427,13 @@ function LinkRow({
   );
 }
 
-function Stepper({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+function Stepper({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
   return (
     <View style={styles.stepper}>
       <Pressable
@@ -400,7 +467,7 @@ const styles = StyleSheet.create({
   title: {
     color: colors.text,
     fontSize: 32,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   section: {
     gap: spacing.sm,
@@ -408,7 +475,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.textMuted,
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   card: {
     backgroundColor: colors.card,
@@ -422,8 +489,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.md,
     minHeight: 36,
   },
@@ -431,24 +498,32 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
   },
+  warnBox: {
+    gap: spacing.xs,
+  },
+  warnLink: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: "600",
+  },
   restHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
   proBadge: {
     color: colors.streak,
     backgroundColor: colors.proBg,
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: "700",
     borderRadius: radius.pill,
     paddingHorizontal: 6,
     paddingVertical: 1,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   leadRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: spacing.sm,
   },
   leadChip: {
@@ -466,7 +541,7 @@ const styles = StyleSheet.create({
   },
   leadTextOn: {
     color: colors.onAccent,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   rowText: {
     flex: 1,
@@ -476,7 +551,7 @@ const styles = StyleSheet.create({
   link: {
     color: colors.accent,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   input: {
     backgroundColor: colors.background,
@@ -487,8 +562,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm + 2,
   },
   stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.sm,
   },
   stepButton: {
@@ -496,20 +571,20 @@ const styles = StyleSheet.create({
     height: 34,
     borderRadius: radius.pill,
     backgroundColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   stepValue: {
     color: colors.text,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     minWidth: 20,
-    textAlign: 'center',
+    textAlign: "center",
   },
   danger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: spacing.sm,
     backgroundColor: colors.dangerBg,
     borderRadius: radius.card,
@@ -518,6 +593,6 @@ const styles = StyleSheet.create({
   dangerText: {
     color: colors.danger,
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });
