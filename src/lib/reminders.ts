@@ -1,12 +1,12 @@
-import { Platform } from "react-native";
-import { requireOptionalNativeModule } from "expo";
-import type * as NotificationsModule from "expo-notifications";
+import { Platform } from 'react-native';
+import { requireOptionalNativeModule } from 'expo';
+import type * as NotificationsModule from 'expo-notifications';
 
-import { confirmAction } from "@/lib/confirm";
-import { formatMinute, fromDateKey, toDateKey } from "@/lib/dates";
-import type { Habit } from "@/state/habits";
+import { confirmAction } from '@/lib/confirm';
+import { formatMinute, fromDateKey, toDateKey } from '@/lib/dates';
+import type { Habit } from '@/state/habits';
 
-const CHANNEL = "reminders";
+const CHANNEL = 'reminders';
 const NUDGE_MINUTE = 20 * 60;
 // iOS keeps at most 64 scheduled notifications per app.
 const MAX_SCHEDULED = 60;
@@ -14,17 +14,17 @@ const MAX_SCHEDULED = 60;
 // Expo Go on Android ships without some of expo-notifications' native parts and
 // crashes on import, so check for them before loading anything.
 export const remindersSupported =
-  Platform.OS !== "web" &&
-  requireOptionalNativeModule("ExpoNotificationScheduler") !== null &&
-  (Platform.OS !== "android" ||
-    requireOptionalNativeModule("ExpoTopicSubscriptionModule") !== null);
+  Platform.OS !== 'web' &&
+  requireOptionalNativeModule('ExpoNotificationScheduler') !== null &&
+  (Platform.OS !== 'android' ||
+    requireOptionalNativeModule('ExpoTopicSubscriptionModule') !== null);
 
 let loaded: typeof NotificationsModule | null = null;
 
 // Imported lazily so unsupported environments never evaluate the module.
 async function notifications() {
   if (loaded) return loaded;
-  loaded = await import("expo-notifications");
+  loaded = await import('expo-notifications');
   loaded.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: true,
@@ -48,10 +48,10 @@ type SyncInput = {
 };
 
 async function ensureChannel(Notifications: typeof NotificationsModule) {
-  if (Platform.OS === "android") {
+  if (Platform.OS === 'android') {
     // Android 13+ only shows the permission prompt once a channel exists.
     await Notifications.setNotificationChannelAsync(CHANNEL, {
-      name: "Reminders",
+      name: 'Reminders',
       importance: Notifications.AndroidImportance.HIGH,
     });
   }
@@ -70,9 +70,9 @@ export async function requestReminderPermission() {
   });
   if (asked.granted && !(await exactTimingAllowed())) {
     const ok = await confirmAction(
-      "Get reminders on time?",
-      "To save battery, Android can send reminders up to half an hour late. Allow Mochi to send them at the exact time by turning on “Alarms & reminders” on the next screen.",
-      "Allow",
+      'Get reminders on time?',
+      'To save battery, Android can send reminders up to half an hour late. Allow Mochi to send them at the exact time by turning on “Alarms & reminders” on the next screen.',
+      'Allow',
     );
     if (ok) await allowExactTiming();
   }
@@ -83,14 +83,14 @@ export async function requestReminderPermission() {
 // minutes late. On-time reminders need "Alarms & reminders", which the person allows in
 // system settings (Android 14+ starts with it off). Always true on iOS.
 export async function exactTimingAllowed() {
-  if (!remindersSupported || Platform.OS !== "android") return true;
+  if (!remindersSupported || Platform.OS !== 'android') return true;
   const Notifications = await notifications();
   return (await Notifications.getExactAlarmPermissionsAsync()).granted;
 }
 
 // Opens the system screen to allow it; resolves when the person comes back.
 export async function allowExactTiming() {
-  if (!remindersSupported || Platform.OS !== "android") return true;
+  if (!remindersSupported || Platform.OS !== 'android') return true;
   const Notifications = await notifications();
   try {
     return (await Notifications.requestExactAlarmPermissionsAsync()).granted;
@@ -99,11 +99,34 @@ export async function allowExactTiming() {
   }
 }
 
+// Rings when a focus session ends, even with the phone locked or the app closed.
+// Returns an id for cancelling it on pause, or null when notifications aren't allowed.
+export async function scheduleFocusEnd(seconds: number, title: string, body: string) {
+  if (!remindersSupported) return null;
+  const Notifications = await notifications();
+  if (!(await Notifications.getPermissionsAsync()).granted) return null;
+  await ensureChannel(Notifications);
+  return Notifications.scheduleNotificationAsync({
+    content: { title, body },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: Math.max(1, Math.round(seconds)),
+      channelId: CHANNEL,
+    },
+  });
+}
+
+export async function cancelFocusEnd(id: string | null) {
+  if (!id || !remindersSupported) return;
+  const Notifications = await notifications();
+  await Notifications.cancelScheduledNotificationAsync(id);
+}
+
 // "5 min" / "1 h 30 min" for reminder text.
 function minutesText(min: number) {
   const h = Math.floor(min / 60);
   const m = min % 60;
-  return [h ? `${h} h` : "", m ? `${m} min` : ""].filter(Boolean).join(" ");
+  return [h ? `${h} h` : '', m ? `${m} min` : ''].filter(Boolean).join(' ');
 }
 
 // Replaces every scheduled notification with the current plan. Cheap enough to
@@ -124,14 +147,11 @@ export async function syncReminders(input: SyncInput) {
     for (const habit of input.habits) {
       if (habit.startMinute === null) continue;
       // Early reminders that would fall before midnight just go at the start.
-      const lead =
-        habit.startMinute >= input.reminderLead ? input.reminderLead : 0;
+      const lead = habit.startMinute >= input.reminderLead ? input.reminderLead : 0;
       const at = habit.startMinute - lead;
       const hour = Math.floor(at / 60);
       const minute = at % 60;
-      const length = habit.durationMin
-        ? ` · ${minutesText(habit.durationMin)}`
-        : "";
+      const length = habit.durationMin ? ` · ${minutesText(habit.durationMin)}` : '';
       // The pet does the talking, so reminders feel like a friend, not an alarm.
       const content = {
         title: lead > 0 ? `${habit.name} in ${minutesText(lead)}` : habit.name,
@@ -140,7 +160,7 @@ export async function syncReminders(input: SyncInput) {
             ? `${input.petName}: Get ready! Starts at ${formatMinute(habit.startMinute)}${length}.`
             : `${input.petName}: It’s time! Let’s do this together${length}.`,
       };
-      if (habit.repeat === "daily") {
+      if (habit.repeat === 'daily') {
         requests.push({
           content,
           trigger: {
@@ -150,7 +170,7 @@ export async function syncReminders(input: SyncInput) {
             channelId: CHANNEL,
           },
         });
-      } else if (habit.repeat === "days") {
+      } else if (habit.repeat === 'days') {
         for (const day of habit.days) {
           requests.push({
             content,
@@ -188,7 +208,7 @@ export async function syncReminders(input: SyncInput) {
     if (date > now) {
       requests.unshift({
         content: {
-          title: "Your streak is at risk",
+          title: 'Your streak is at risk',
           body: `${input.petName} is waiting. A couple of quick check-ins will keep it going.`,
         },
         trigger: {
@@ -205,7 +225,7 @@ export async function syncReminders(input: SyncInput) {
     requests.unshift({
       content: {
         title: `Your week with ${input.petName}`,
-        body: "See how your week went and set up the next one. Open Progress.",
+        body: 'See how your week went and set up the next one. Open Progress.',
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.WEEKLY,

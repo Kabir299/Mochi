@@ -49,6 +49,8 @@ export type Settings = {
   dayCheckSeen: string;
   // Pro: weekdays (0 = Sunday, comma separated) where skipping keeps the streak.
   restDays: string;
+  // Focus timer keeps the screen awake while it runs.
+  focusKeepAwake: boolean;
 };
 
 const DEFAULTS: Settings = {
@@ -73,6 +75,7 @@ const DEFAULTS: Settings = {
   repairPending: '',
   dayCheckSeen: '',
   restDays: '0',
+  focusKeepAwake: false,
 };
 
 type SettingsContextValue = Settings & {
@@ -115,6 +118,7 @@ function parse(raw: Record<string, string>): Settings {
     repairPending: raw.repairPending ?? '',
     dayCheckSeen: raw.dayCheckSeen ?? '',
     restDays: raw.restDays ?? DEFAULTS.restDays,
+    focusKeepAwake: raw.focusKeepAwake === '1',
     profile: raw.profile ?? '',
   };
 }

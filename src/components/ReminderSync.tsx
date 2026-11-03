@@ -1,10 +1,10 @@
-import { useEffect } from "react";
+import { useEffect } from 'react';
 
-import { toDateKey } from "@/lib/dates";
-import { syncReminders } from "@/lib/reminders";
-import { useHabits } from "@/state/habits";
-import { useSettings } from "@/state/settings";
-import { useExactTiming } from "@/state/useExactTiming";
+import { toDateKey } from '@/lib/dates';
+import { syncReminders } from '@/lib/reminders';
+import { useHabits } from '@/state/habits';
+import { useSettings } from '@/state/settings';
+import { useExactTiming } from '@/state/useExactTiming';
 
 // Keeps scheduled notifications in step with habits and settings.
 export function ReminderSync() {
@@ -14,23 +14,13 @@ export function ReminderSync() {
   const exact = useExactTiming();
   // No "streak at risk" nudge on a Pro rest day.
   const restToday =
-    settings.isPro &&
-    settings.restDays.split(",").includes(String(new Date().getDay()));
+    settings.isPro && settings.restDays.split(',').includes(String(new Date().getDay()));
   const streakSecured =
-    restToday ||
-    (dayProgress(toDateKey(new Date())) ?? 0) >= settings.streakThreshold;
+    restToday || (dayProgress(toDateKey(new Date())) ?? 0) >= settings.streakThreshold;
 
   // Only what affects the schedule, so ordinary taps don't reschedule.
   const signature = JSON.stringify([
-    habits.map((h) => [
-      h.id,
-      h.name,
-      h.repeat,
-      h.days,
-      h.onceDay,
-      h.startMinute,
-      h.durationMin,
-    ]),
+    habits.map((h) => [h.id, h.name, h.repeat, h.days, h.onceDay, h.startMinute, h.durationMin]),
     settings.remindersOn,
     settings.streakNudge,
     streakSecured,
