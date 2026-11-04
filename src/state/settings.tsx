@@ -77,7 +77,7 @@ const DEFAULTS: Settings = {
   streakNudge: true,
   onboarded: false,
   profile: '',
-  appLock: false,
+  appLock: true,
   bodyGoalAsked: false,
   repairedDays: '',
   repairPending: '',
@@ -126,7 +126,8 @@ function parse(raw: Record<string, string>): Settings {
     weeklyRecap: raw.weeklyRecap !== undefined ? raw.weeklyRecap === '1' : DEFAULTS.weeklyRecap,
     streakNudge: raw.streakNudge !== undefined ? raw.streakNudge === '1' : DEFAULTS.streakNudge,
     onboarded: raw.onboarded === '1',
-    appLock: raw.appLock === '1',
+    // On unless the person turned it off.
+    appLock: raw.appLock !== '0',
     bodyGoalAsked: raw.bodyGoalAsked === '1',
     repairedDays: raw.repairedDays ?? '',
     repairPending: raw.repairPending ?? '',

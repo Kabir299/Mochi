@@ -39,7 +39,7 @@ and your store purchase receipts. It is not linked to your name or email.
 
 ## App lock
 
-If you turn on App lock, your phone checks your fingerprint, face or PIN itself. The app only
+App lock is on by default on phones with a screen lock, and you can turn it off in Settings. Your phone checks your fingerprint, face or PIN itself. The app only
 learns "unlocked" or "not unlocked" and never sees or stores the biometric data.
 
 ## Notifications

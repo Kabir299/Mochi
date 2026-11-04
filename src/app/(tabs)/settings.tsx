@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -78,9 +78,19 @@ export default function SettingsScreen() {
     }
   };
 
+  // Without a screen lock on the phone the app lock can't apply, so it shows as off.
+  const [noDeviceLock, setNoDeviceLock] = useState(false);
+  useEffect(() => {
+    if (!lockSupported) return;
+    lockUnavailableReason()
+      .then((problem) => setNoDeviceLock(problem !== null))
+      .catch(() => setNoDeviceLock(true));
+  }, []);
+
   const toggleLock = async (on: boolean) => {
     // Prove it works before turning it on, so nobody locks themselves out.
     const problem = on ? await lockUnavailableReason() : null;
+    setNoDeviceLock(problem !== null);
     if (problem) {
       Alert.alert('App lock', problem);
       return;
@@ -249,7 +259,7 @@ export default function SettingsScreen() {
           {lockSupported && (
             <ToggleRow
               label="App lock (fingerprint, face or PIN)"
-              value={settings.appLock}
+              value={settings.appLock && !noDeviceLock}
               onChange={toggleLock}
             />
           )}

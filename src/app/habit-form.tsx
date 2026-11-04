@@ -16,9 +16,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { closeModal } from '@/lib/nav';
 import { Segmented } from '@/components/Segmented';
+import { TimeWheel } from '@/components/TimeWheel';
 import { confirmDestructive } from '@/lib/confirm';
 import { guessIcon, HABIT_ICONS } from '@/lib/icons';
 import { formatDuration, formatMinute, fromDateKey, toDateKey } from '@/lib/dates';
+import { nextFreeMinute, rememberAddedTask } from '@/lib/nextSlot';
 import { Habit, IconName, Repeat, useHabits } from '@/state/habits';
 import { colors, radius, spacing } from '@/theme';
 
@@ -114,7 +116,7 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
           day: 'numeric',
           month: 'short',
         });
-  const { addHabit, editHabit, removeHabit, archiveHabit } = useHabits();
+  const { addHabit, editHabit, removeHabit, archiveHabit, habitsOn } = useHabits();
 
   const [name, setName] = useState(existing?.name ?? '');
   const [icon, setIcon] = useState<IconName>(existing?.icon ?? HABIT_ICONS[0]);
@@ -126,7 +128,17 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
   const [timeMode, setTimeMode] = useState<TimeMode>(
     existing && existing.startMinute === null ? 'anytime' : 'timed',
   );
-  const [startMinute, setStartMinute] = useState(existing?.startMinute ?? nextQuarterHour());
+  const [startMinute, setStartMinute] = useState(
+    () =>
+      existing?.startMinute ??
+      nextFreeMinute(
+        forDay,
+        nextQuarterHour(),
+        habitsOn(forDay).flatMap((h) =>
+          h.startMinute === null ? [] : [{ start: h.startMinute, duration: h.durationMin ?? 30 }],
+        ),
+      ),
+  );
   const [durationMin, setDurationMin] = useState(existing?.durationMin ?? 30);
   const [days, setDays] = useState<number[]>(
     existing?.days.length ? existing.days : [1, 2, 3, 4, 5],
@@ -198,6 +210,9 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
         await editHabit(existing.id, input);
       } else {
         await addHabit(input);
+        if (input.startMinute !== null) {
+          rememberAddedTask(forDay, input.startMinute, input.durationMin ?? 30);
+        }
       }
       closeModal();
     } catch {
@@ -210,7 +225,7 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
   const minuteToDate = (m: number) => new Date(2000, 0, 1, Math.floor(m / 60), m % 60);
   const dateToMinute = (d: Date) => d.getHours() * 60 + d.getMinutes();
 
-  // The phone's own clock picker; the web preview keeps the +/- buttons only.
+  // The phone's own clock picker, for a time that isn't on the wheel's 15-minute steps.
   const openTimePicker = () => {
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
@@ -307,36 +322,12 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
                     <Segmented options={TIME_OPTIONS} value={timeMode} onChange={setTimeMode} />
                     {timeMode === 'timed' ? (
                       <>
-                        <View style={styles.timeRow}>
-                          <Text style={styles.timeLabel}>Starts</Text>
-                          <Pressable
-                            onPress={() =>
-                              setStartMinute((m) => (m - TIME_STEP + DAY_MINUTES) % DAY_MINUTES)
-                            }
-                            style={styles.timeButton}
-                            accessibilityLabel="Earlier"
-                          >
-                            <Ionicons name="remove" size={20} color={colors.text} />
+                        <TimeWheel value={startMinute} durationMin={durationMin} onChange={setStartMinute} />
+                        {Platform.OS !== 'web' && (
+                          <Pressable onPress={openTimePicker} hitSlop={8} accessibilityRole="button">
+                            <Text style={styles.exactLink}>Pick an exact time</Text>
                           </Pressable>
-                          <Pressable
-                            onPress={openTimePicker}
-                            accessibilityRole="button"
-                            accessibilityLabel="Pick a time"
-                          >
-                            <Text
-                              style={[styles.timeValue, Platform.OS !== 'web' && styles.timeTappable]}
-                            >
-                              {formatMinute(startMinute)}
-                            </Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={() => setStartMinute((m) => (m + TIME_STEP) % DAY_MINUTES)}
-                            style={styles.timeButton}
-                            accessibilityLabel="Later"
-                          >
-                            <Ionicons name="add" size={20} color={colors.text} />
-                          </Pressable>
-                        </View>
+                        )}
                         {iosPicker && Platform.OS === 'ios' && (
                           <DateTimePicker
                             value={minuteToDate(startMinute)}
@@ -562,34 +553,12 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
             <Segmented options={TIME_OPTIONS} value={timeMode} onChange={setTimeMode} />
             {timeMode === 'timed' && (
               <>
-                <View style={styles.timeRow}>
-                  <Text style={styles.timeLabel}>Starts</Text>
-                  <Pressable
-                    onPress={() =>
-                      setStartMinute((m) => (m - TIME_STEP + DAY_MINUTES) % DAY_MINUTES)
-                    }
-                    style={styles.timeButton}
-                    accessibilityLabel="Earlier"
-                  >
-                    <Ionicons name="remove" size={20} color={colors.text} />
+                <TimeWheel value={startMinute} durationMin={durationMin} onChange={setStartMinute} />
+                {Platform.OS !== 'web' && (
+                  <Pressable onPress={openTimePicker} hitSlop={8} accessibilityRole="button">
+                    <Text style={styles.exactLink}>Pick an exact time</Text>
                   </Pressable>
-                  <Pressable
-                    onPress={openTimePicker}
-                    accessibilityRole="button"
-                    accessibilityLabel="Pick a time"
-                  >
-                    <Text style={[styles.timeValue, Platform.OS !== 'web' && styles.timeTappable]}>
-                      {formatMinute(startMinute)}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setStartMinute((m) => (m + TIME_STEP) % DAY_MINUTES)}
-                    style={styles.timeButton}
-                    accessibilityLabel="Later"
-                  >
-                    <Ionicons name="add" size={20} color={colors.text} />
-                  </Pressable>
-                </View>
+                )}
                 {iosPicker && Platform.OS === 'ios' && (
                   <DateTimePicker
                     value={minuteToDate(startMinute)}
@@ -828,10 +797,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: spacing.sm,
   },
-  timeTappable: {
-    textDecorationLine: 'underline',
-    textDecorationColor: colors.accent,
-  },
   archiveButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -847,31 +812,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
+  exactLink: {
+    color: colors.textMuted,
+    fontSize: 13,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
   timeLabel: {
     flex: 1,
     color: colors.text,
     fontSize: 15,
-  },
-  timeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.pill,
-    backgroundColor: colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  timeValue: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '600',
-    minWidth: 90,
-    textAlign: 'center',
   },
   chips: {
     flexDirection: 'row',

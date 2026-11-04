@@ -3,15 +3,20 @@ import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Pet } from '@/components/Pet';
-import { lockSupported, unlock } from '@/lib/lock';
+import { lockSupported, lockUnavailableReason, unlock } from '@/lib/lock';
 import { useSettings } from '@/state/settings';
 import { colors, radius, spacing } from '@/theme';
 
 // Covers the app while it's in the app switcher, and when App lock is on, asks for
 // fingerprint / Face ID / PIN on launch and after the app has been in the background.
+// It's on by default, but only applies once setup is done and on a phone with a screen
+// lock, so nobody can be locked out of the app.
 export function AppLock() {
-  const { loaded, appLock, petName } = useSettings();
-  const enabled = lockSupported && appLock;
+  const { loaded, appLock, onboarded, petName } = useSettings();
+  const wanted = lockSupported && appLock && onboarded;
+  // Whether this phone has a screen lock; null until checked.
+  const [secure, setSecure] = useState<boolean | null>(null);
+  const enabled = wanted && secure === true;
   const [locked, setLocked] = useState(false);
   const [launchChecked, setLaunchChecked] = useState(false);
   const [covered, setCovered] = useState(false);
@@ -28,8 +33,16 @@ export function AppLock() {
     }
   }, []);
 
+  const checkSecure = useCallback(() => {
+    lockUnavailableReason()
+      .then((problem) => setSecure(problem === null))
+      .catch(() => setSecure(false));
+  }, []);
+
   useEffect(() => {
+    checkSecure();
     const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkSecure();
       // The system unlock prompt itself makes the app 'inactive'; don't relock for that.
       if (state === 'background' && enabled) {
         wasBackground.current = true;
@@ -43,10 +56,10 @@ export function AppLock() {
       }
     });
     return () => sub.remove();
-  }, [enabled, tryUnlock]);
+  }, [enabled, tryUnlock, checkSecure]);
 
   // Lock at launch only if it was already on (turning it on in Settings shouldn't lock).
-  if (loaded && !launchChecked) {
+  if (loaded && secure !== null && !launchChecked) {
     setLaunchChecked(true);
     if (enabled) setLocked(true);
   }
@@ -57,7 +70,9 @@ export function AppLock() {
 
   if (!loaded) return null;
   const showLock = enabled && locked;
-  if (!showLock && !covered) return null;
+  // Keeps the app hidden for the moment the launch check takes.
+  const checking = wanted && !launchChecked;
+  if (!showLock && !covered && !checking) return null;
 
   return (
     <View style={styles.cover}>
