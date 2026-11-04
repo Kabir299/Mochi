@@ -66,8 +66,13 @@ export type FoodLog = {
 
 export type FoodInput = Omit<FoodLog, 'id'>;
 
+export type GymLog = {
+  id: number;
+  day: DateKey;
+  minutes: number;
+};
 
-const DATABASE_VERSION = 8;
+const DATABASE_VERSION = 9;
 
 // Runs before the app renders. Each schema change gets its own
 // `if (version === N)` step so existing installs upgrade in place.
@@ -168,6 +173,19 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
     // got it drop it here, the rest just move on, so later versions stay in step.
     await db.execAsync('DROP TABLE IF EXISTS day_logs;');
     version = 8;
+  }
+
+  if (version === 8) {
+    await db.execAsync(`
+      CREATE TABLE gym_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        day TEXT NOT NULL,
+        minutes INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX gym_logs_day ON gym_logs (day);
+    `);
+    version = 9;
   }
 
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
@@ -296,6 +314,26 @@ export async function deleteFood(db: SQLiteDatabase, id: number) {
   await db.runAsync('DELETE FROM food_logs WHERE id = ?', id);
 }
 
+export function getGymLogs(db: SQLiteDatabase, fromDay: DateKey) {
+  return db.getAllAsync<GymLog>(
+    'SELECT id, day, minutes FROM gym_logs WHERE day >= ? ORDER BY id',
+    fromDay,
+  );
+}
+
+export async function insertGym(db: SQLiteDatabase, day: DateKey, minutes: number) {
+  const result = await db.runAsync(
+    'INSERT INTO gym_logs (day, minutes) VALUES (?, ?)',
+    day,
+    minutes,
+  );
+  return result.lastInsertRowId;
+}
+
+export async function deleteGym(db: SQLiteDatabase, id: number) {
+  await db.runAsync('DELETE FROM gym_logs WHERE id = ?', id);
+}
+
 export async function setLogNote(
   db: SQLiteDatabase,
   habitId: number,
@@ -349,16 +387,18 @@ export type Backup = {
   logs: Row[];
   water: Row[];
   food: Row[];
+  gym: Row[];
   settings: Row[];
 };
 
 // Everything the user has entered: the export, and the backup file for a new phone.
 export async function exportAll(db: SQLiteDatabase): Promise<Backup> {
-  const [habits, logs, water, food, settings] = await Promise.all([
+  const [habits, logs, water, food, gym, settings] = await Promise.all([
     db.getAllAsync<Row>('SELECT * FROM habits'),
     db.getAllAsync<Row>('SELECT * FROM logs'),
     db.getAllAsync<Row>('SELECT * FROM water_logs'),
     db.getAllAsync<Row>('SELECT * FROM food_logs'),
+    db.getAllAsync<Row>('SELECT * FROM gym_logs'),
     db.getAllAsync<Row>('SELECT * FROM settings'),
   ]);
   return {
@@ -369,6 +409,7 @@ export async function exportAll(db: SQLiteDatabase): Promise<Backup> {
     logs,
     water,
     food,
+    gym,
     settings,
   };
 }
@@ -378,6 +419,7 @@ const BACKUP_TABLES = [
   ['logs', 'logs'],
   ['water', 'water_logs'],
   ['food', 'food_logs'],
+  ['gym', 'gym_logs'],
   ['settings', 'settings'],
 ] as const;
 
@@ -415,6 +457,7 @@ export function parseBackup(text: string): Backup {
     logs: d.logs,
     water: d.water ?? [],
     food: d.food ?? [],
+    gym: d.gym ?? [],
     settings: d.settings ?? [],
   };
   for (const [key] of BACKUP_TABLES) {
@@ -461,6 +504,7 @@ export async function deleteAllData(db: SQLiteDatabase) {
     await db.runAsync('DELETE FROM habits');
     await db.runAsync('DELETE FROM water_logs');
     await db.runAsync('DELETE FROM food_logs');
+    await db.runAsync('DELETE FROM gym_logs');
     await db.runAsync("DELETE FROM settings WHERE key != 'starterSeeded'");
   });
 }

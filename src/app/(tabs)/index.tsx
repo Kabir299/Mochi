@@ -8,6 +8,7 @@ import { ActionSheet, SheetAction } from '@/components/ActionSheet';
 import { Confetti } from '@/components/Confetti';
 import { UndoToast } from '@/components/UndoToast';
 import { DayPicker } from '@/components/DayPicker';
+import { Guide, GuideStep } from '@/components/Guide';
 import { HabitRow } from '@/components/HabitRow';
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { Pet } from '@/components/Pet';
@@ -31,6 +32,7 @@ import { STARTER_HABITS } from '@/lib/starter';
 import { computeDayStreak, streakProgress } from '@/lib/streak';
 import { Habit, useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
+import { useRestoreBackup } from '@/state/useRestoreBackup';
 import { colors, radius, spacing } from '@/theme';
 
 const openNewHabit = (day?: DateKey) =>
@@ -82,6 +84,7 @@ export default function TodayScreen() {
     moveHabit,
   } = useHabits();
   const settings = useSettings();
+  const restoreBackup = useRestoreBackup();
 
   const today = useToday();
   const todayKey = toDateKey(today);
@@ -274,6 +277,39 @@ export default function TodayScreen() {
     return list;
   };
 
+  const guideSteps: GuideStep[] = [
+    {
+      icon: 'add',
+      title: 'Add a task',
+      body: 'Tap + at the top right. Tell me what it is, when, and for how long.',
+    },
+    {
+      icon: 'checkmark-circle-outline',
+      title: 'Tick it off',
+      body: 'Tap a task when it’s done. Your day fills up, and I cheer you on.',
+    },
+    {
+      icon: 'ellipsis-vertical',
+      title: 'More on each task',
+      body: 'Tap ⋮ on a task for the focus timer, notes, editing and more.',
+    },
+    {
+      icon: 'flame-outline',
+      title: 'Keep your streak',
+      body: `Reach ${thresholdPct}% of your day to keep your streak going. Freezes cover the odd missed day.`,
+    },
+    {
+      icon: 'sparkles-outline',
+      title: 'Let AI help',
+      body: `Tap ✨ to plan your day, review your habits or chat with your coach.${settings.isPro ? '' : ' Part of Pro.'}`,
+    },
+    {
+      icon: 'settings-outline',
+      title: 'Your data, your phone',
+      body: 'Progress shows your trends. Settings has reminders and backups, and you can restore data from an old phone there any time.',
+    },
+  ];
+
   const aiActions: SheetAction[] = [
     {
       icon: 'analytics-outline',
@@ -406,6 +442,9 @@ export default function TodayScreen() {
             </Pressable>
             <Pressable onPress={() => openNewHabit()} hitSlop={8}>
               <Text style={styles.emptyLink}>Create my own</Text>
+            </Pressable>
+            <Pressable onPress={restoreBackup} hitSlop={8}>
+              <Text style={styles.emptyLink}>Restore a backup</Text>
             </Pressable>
           </View>
         )}
@@ -577,6 +616,9 @@ export default function TodayScreen() {
         )}
       </ScrollView>
 
+      {settings.loaded && !settings.guideSeen && (
+        <Guide steps={guideSteps} onDone={() => settings.update({ guideSeen: true })} />
+      )}
       <ActionSheet
         visible={menuHabit !== null}
         title={menuHabit?.name}

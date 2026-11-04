@@ -61,7 +61,7 @@ export function AppLock() {
 
   return (
     <View style={styles.cover}>
-      <Pet mood={showLock ? 'sleepy' : 'happy'} />
+      <Pet mood="happy" />
       {showLock && (
         <>
           <Text style={styles.title}>{petName} is keeping your data safe</Text>

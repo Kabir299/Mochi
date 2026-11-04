@@ -14,7 +14,7 @@ import { useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
 import { colors, radius, spacing } from '@/theme';
 
-// "Do you also have a body goal?" Shown on the Nutrition tab the first time, and again
+// "Do you also have a body goal?" Shown on the Health tab the first time, and again
 // from the small Body goal row. Sets calorie / protein / water targets and can add
 // matching habits (fitted around times already taken).
 export function BodyGoalCard() {

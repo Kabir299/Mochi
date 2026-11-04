@@ -93,7 +93,7 @@ export default function SettingsScreen() {
   const resetAll = async () => {
     const ok = await confirmDestructive(
       'Delete all data?',
-      'Every habit, check-in, note, water and food log will be erased from this phone. This can’t be undone.',
+      'Every habit, check-in, note, water, food and gym log will be erased from this phone. This can’t be undone.',
       'Delete everything',
     );
     if (!ok) return;
@@ -269,6 +269,14 @@ export default function SettingsScreen() {
             onPress={() => router.push('/onboarding?redo=1')}
           />
           <LinkRow
+            icon="help-circle-outline"
+            label="Show the guide again"
+            onPress={async () => {
+              await settings.update({ guideSeen: false, nutritionGuideSeen: false });
+              router.navigate('/');
+            }}
+          />
+          <LinkRow
             icon="albums-outline"
             label="Habit templates"
             onPress={() => router.push('/templates')}
@@ -366,6 +374,7 @@ function LinkRow({
   icon:
     | 'compass-outline'
     | 'albums-outline'
+    | 'help-circle-outline'
     | 'diamond-outline'
     | 'cloud-upload-outline'
     | 'cloud-download-outline'

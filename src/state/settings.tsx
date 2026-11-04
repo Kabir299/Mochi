@@ -51,6 +51,14 @@ export type Settings = {
   restDays: string;
   // Focus timer keeps the screen awake while it runs.
   focusKeepAwake: boolean;
+  // The walkthroughs on Today and on the first visit to Nutrition have been shown.
+  guideSeen: boolean;
+  nutritionGuideSeen: boolean;
+  // What the Health tab shows, chosen on the first visit (see TrackPicker).
+  trackAsked: boolean;
+  trackFood: boolean;
+  trackWater: boolean;
+  trackGym: boolean;
 };
 
 const DEFAULTS: Settings = {
@@ -76,6 +84,12 @@ const DEFAULTS: Settings = {
   dayCheckSeen: '',
   restDays: '0',
   focusKeepAwake: false,
+  guideSeen: false,
+  nutritionGuideSeen: false,
+  trackAsked: false,
+  trackFood: false,
+  trackWater: false,
+  trackGym: false,
 };
 
 type SettingsContextValue = Settings & {
@@ -119,6 +133,12 @@ function parse(raw: Record<string, string>): Settings {
     dayCheckSeen: raw.dayCheckSeen ?? '',
     restDays: raw.restDays ?? DEFAULTS.restDays,
     focusKeepAwake: raw.focusKeepAwake === '1',
+    guideSeen: raw.guideSeen === '1',
+    nutritionGuideSeen: raw.nutritionGuideSeen === '1',
+    trackAsked: raw.trackAsked === '1',
+    trackFood: raw.trackFood === '1',
+    trackWater: raw.trackWater === '1',
+    trackGym: raw.trackGym === '1',
     profile: raw.profile ?? '',
   };
 }

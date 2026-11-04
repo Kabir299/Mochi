@@ -43,7 +43,7 @@ const STEPS = 3;
 
 // First launch: a few questions about the person, then a starting plan built
 // around them. Also reachable from Settings → Redo setup. The body goal is asked on
-// the Nutrition tab, and when / how long to work in Plan my day.
+// the Health tab, and when / how long to work in Plan my day.
 export default function OnboardingScreen() {
   const { redo } = useLocalSearchParams<{ redo?: string }>();
   const settings = useSettings();
@@ -148,9 +148,7 @@ export default function OnboardingScreen() {
   };
 
   const restore = async () => {
-    if (!(await restoreBackup())) return;
-    await settings.update({ onboarded: true });
-    leave();
+    if (await restoreBackup()) leave();
   };
 
   const skip = async () => {

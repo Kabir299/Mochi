@@ -44,9 +44,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="nutrition"
         options={{
-          title: 'Nutrition',
+          title: 'Health',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="nutrition-outline" size={size} color={color as string} />
+            <Ionicons name="fitness-outline" size={size} color={color as string} />
           ),
         }}
       />

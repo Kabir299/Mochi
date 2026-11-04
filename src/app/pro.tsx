@@ -48,14 +48,9 @@ const FEATURES: { icon: IconName; title: string; body: string }[] = [
     body: 'Pick days off, like Sunday, that never break your streak.',
   },
   {
-    icon: 'water-outline',
-    title: 'Water tracking',
-    body: 'One-tap glasses, a daily goal and your 7-day history.',
-  },
-  {
     icon: 'restaurant-outline',
-    title: 'Food tracking',
-    body: 'Log meals with calories and protein against your daily goals.',
+    title: 'Calorie tracking',
+    body: 'Log meals with AI-estimated calories and protein against your daily goals.',
   },
 ];
 

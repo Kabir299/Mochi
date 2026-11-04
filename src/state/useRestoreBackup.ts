@@ -54,6 +54,8 @@ export function useRestoreBackup() {
       return false;
     }
     await Promise.all([reload(), nutrition.reload(), settings.reload()]);
+    // Someone restoring already knows the app, whatever the file says.
+    await settings.update({ onboarded: true, guideSeen: true, nutritionGuideSeen: true });
     return true;
   }, [database, habits.length, reload, nutrition, settings]);
 }

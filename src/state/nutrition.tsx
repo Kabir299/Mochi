@@ -19,12 +19,15 @@ type NutritionContextValue = {
   loaded: boolean;
   water: db.WaterLog[];
   food: db.FoodLog[];
+  gym: db.GymLog[];
   waterFor: (day: DateKey) => number;
   foodFor: (day: DateKey) => db.FoodLog[];
   addWater: (day: DateKey, ml: number) => Promise<void>;
   removeWater: (id: number) => Promise<void>;
   addFood: (input: db.FoodInput) => Promise<void>;
   removeFood: (id: number) => Promise<void>;
+  addGym: (day: DateKey, minutes: number) => Promise<void>;
+  removeGym: (id: number) => Promise<void>;
   reload: () => Promise<void>;
 };
 
@@ -35,15 +38,18 @@ export function NutritionProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const [water, setWater] = useState<db.WaterLog[]>([]);
   const [food, setFood] = useState<db.FoodLog[]>([]);
+  const [gym, setGym] = useState<db.GymLog[]>([]);
 
   const reload = useCallback(async () => {
     const from = toDateKey(addDays(new Date(), -(HISTORY_DAYS - 1)));
-    const [waterRows, foodRows] = await Promise.all([
+    const [waterRows, foodRows, gymRows] = await Promise.all([
       db.getWaterLogs(database, from),
       db.getFoodLogs(database, from),
+      db.getGymLogs(database, from),
     ]);
     setWater(waterRows);
     setFood(foodRows);
+    setGym(gymRows);
   }, [database]);
 
   useEffect(() => {
@@ -96,20 +102,53 @@ export function NutritionProvider({ children }: { children: ReactNode }) {
     [database],
   );
 
+  const addGym = useCallback(
+    async (day: DateKey, minutes: number) => {
+      const id = await db.insertGym(database, day, minutes);
+      setGym((prev) => [...prev, { id, day, minutes }]);
+    },
+    [database],
+  );
+
+  const removeGym = useCallback(
+    async (id: number) => {
+      await db.deleteGym(database, id);
+      setGym((prev) => prev.filter((g) => g.id !== id));
+    },
+    [database],
+  );
+
   const value = useMemo(
     () => ({
       loaded,
       water,
       food,
+      gym,
       waterFor,
       foodFor,
       addWater,
       removeWater,
       addFood,
       removeFood,
+      addGym,
+      removeGym,
       reload,
     }),
-    [loaded, water, food, waterFor, foodFor, addWater, removeWater, addFood, removeFood, reload],
+    [
+      loaded,
+      water,
+      food,
+      gym,
+      waterFor,
+      foodFor,
+      addWater,
+      removeWater,
+      addFood,
+      removeFood,
+      addGym,
+      removeGym,
+      reload,
+    ],
   );
 
   return <NutritionContext.Provider value={value}>{children}</NutritionContext.Provider>;

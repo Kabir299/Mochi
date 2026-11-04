@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -5,16 +6,20 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BodyGoalCard } from '@/components/BodyGoalCard';
+import { Guide, GuideStep } from '@/components/Guide';
 import { ProgressChart } from '@/components/ProgressChart';
 import { ProLock } from '@/components/ProLock';
-import { lastNDays, toDateKey } from '@/lib/dates';
+import { TrackPicker } from '@/components/TrackPicker';
+import { formatDuration, lastNDays, toDateKey } from '@/lib/dates';
 import { useToday } from '@/lib/useToday';
 import type { Meal } from '@/lib/db';
+import { useHabits } from '@/state/habits';
 import { useNutrition } from '@/state/nutrition';
 import { useSettings } from '@/state/settings';
 import { colors, radius, spacing } from '@/theme';
 
 const WATER_AMOUNTS = [250, 500, 750];
+const GYM_MINUTES = [30, 45, 60, 90];
 const MEALS: [Meal, string][] = [
   ['breakfast', 'Breakfast'],
   ['lunch', 'Lunch'],
@@ -24,9 +29,33 @@ const MEALS: [Meal, string][] = [
 
 const fmt = (n: number) => n.toLocaleString();
 
+const WATER_STEP: GuideStep = {
+  icon: 'water-outline',
+  title: 'Track your water',
+  body: 'Tap +250, +500 or +750 ml as you drink. The arrow undoes the last one.',
+};
+const GYM_STEP: GuideStep = {
+  icon: 'barbell-outline',
+  title: 'Log your gym sessions',
+  body: 'Tap how long you trained. If you have a Gym habit, I’ll tick it off too.',
+};
+const FOOD_STEP: GuideStep = {
+  icon: 'restaurant-outline',
+  title: 'Log your food',
+  body: 'Tap Add food and type what you ate. AI can estimate the calories and protein for you.',
+};
+const GOAL_STEP: GuideStep = {
+  icon: 'body-outline',
+  title: 'Set a body goal',
+  body: 'Optional. Tell me your goal and I’ll suggest your daily targets.',
+};
+
 export default function NutritionScreen() {
   const settings = useSettings();
-  const { water, waterFor, foodFor, addWater, removeWater, removeFood } = useNutrition();
+  const { water, gym, waterFor, foodFor, addWater, removeWater, removeFood, addGym, removeGym } =
+    useNutrition();
+  const { habitsOn, isDone, checkIn } = useHabits();
+  const [choosing, setChoosing] = useState(false);
 
   const today = useToday();
   const todayKey = toDateKey(today);
@@ -50,181 +79,277 @@ export default function NutritionScreen() {
     return { date, key, value: waterFor(key) };
   });
 
+  const weekDays = new Set(lastNDays(today, 7).map(toDateKey));
+  const gymWeek = gym.filter((g) => weekDays.has(g.day));
+  const gymWeekMin = gymWeek.reduce((s, g) => s + g.minutes, 0);
+  const lastGymToday = [...gym].reverse().find((g) => g.day === todayKey);
+
+  const logGym = async (minutes: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await addGym(todayKey, minutes);
+    const habit = habitsOn(todayKey).find(
+      (h) => /gym|workout/i.test(h.name) && !isDone(h, todayKey),
+    );
+    if (habit) checkIn(habit, todayKey);
+  };
+
+  const { trackAsked, trackFood, trackWater, trackGym, isPro } = settings;
+  const picking = !trackAsked || choosing;
+  const foodOn = trackFood && isPro;
+  const guideSteps: GuideStep[] = [
+    ...(trackWater ? [WATER_STEP] : []),
+    ...(trackGym ? [GYM_STEP] : []),
+    ...(foodOn ? [FOOD_STEP] : []),
+    ...(trackWater || foodOn ? [GOAL_STEP] : []),
+  ];
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {/* Tabs mount on first open, so nothing here shows until this tab is first tapped. */}
+      {!picking && !settings.nutritionGuideSeen && guideSteps.length > 0 && (
+        <Guide steps={guideSteps} onDone={() => settings.update({ nutritionGuideSeen: true })} />
+      )}
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Nutrition</Text>
-        <BodyGoalCard />
-
-        {!settings.isPro ? (
-          <ProLock
-            title="Track water and food"
-            body="Log glasses of water in one tap, record meals with calories and protein, and see how you're doing against your daily goals."
-          />
+        <Text style={styles.title}>Health</Text>
+        {picking ? (
+          <TrackPicker onDone={() => setChoosing(false)} />
         ) : (
           <>
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="water-outline" size={20} color={colors.water} />
-                <Text style={styles.cardTitle}>Water</Text>
-              </View>
-              <Text style={styles.big}>
-                {fmt(waterToday)}
-                <Text style={styles.bigUnit}> / {fmt(settings.waterGoalMl)} ml</Text>
-              </Text>
-              <Bar value={waterToday / settings.waterGoalMl} color={colors.water} />
-              <View style={styles.quickRow}>
-                {WATER_AMOUNTS.map((ml) => (
+            {(trackWater || foodOn) && <BodyGoalCard />}
+
+            {!trackWater && !trackFood && !trackGym && (
+              <Text style={styles.sub}>You’re not tracking anything here right now.</Text>
+            )}
+
+            {trackWater && (
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Ionicons name="water-outline" size={20} color={colors.water} />
+                  <Text style={styles.cardTitle}>Water</Text>
+                </View>
+                <Text style={styles.big}>
+                  {fmt(waterToday)}
+                  <Text style={styles.bigUnit}> / {fmt(settings.waterGoalMl)} ml</Text>
+                </Text>
+                <Bar value={waterToday / settings.waterGoalMl} color={colors.water} />
+                <View style={styles.quickRow}>
+                  {WATER_AMOUNTS.map((ml) => (
+                    <Pressable
+                      key={ml}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        addWater(todayKey, ml);
+                      }}
+                      style={({ pressed }) => [styles.quick, pressed && styles.pressed]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Add ${ml} millilitres`}
+                    >
+                      <Text style={styles.quickText}>+{ml} ml</Text>
+                    </Pressable>
+                  ))}
                   <Pressable
-                    key={ml}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      addWater(todayKey, ml);
-                    }}
-                    style={({ pressed }) => [styles.quick, pressed && styles.pressed]}
+                    onPress={() => lastWaterToday && removeWater(lastWaterToday.id)}
+                    style={({ pressed }) => [
+                      styles.undo,
+                      !lastWaterToday && styles.disabled,
+                      pressed && styles.pressed,
+                    ]}
                     accessibilityRole="button"
-                    accessibilityLabel={`Add ${ml} millilitres`}
+                    accessibilityLabel="Undo last water"
                   >
-                    <Text style={styles.quickText}>+{ml} ml</Text>
+                    <Ionicons name="arrow-undo-outline" size={18} color={colors.text} />
                   </Pressable>
-                ))}
-                <Pressable
-                  onPress={() => lastWaterToday && removeWater(lastWaterToday.id)}
-                  style={({ pressed }) => [
-                    styles.undo,
-                    !lastWaterToday && styles.disabled,
-                    pressed && styles.pressed,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Undo last water"
-                >
-                  <Ionicons name="arrow-undo-outline" size={18} color={colors.text} />
-                </Pressable>
-              </View>
-              <View style={styles.chart}>
-                <ProgressChart
-                  points={waterWeek}
-                  max={settings.waterGoalMl}
-                  format={(v) => `${fmt(v)} ml`}
-                  gridLabels={[
-                    `${fmt(settings.waterGoalMl)}`,
-                    `${fmt(settings.waterGoalMl / 2)}`,
-                    '0',
-                  ]}
-                />
-              </View>
-            </View>
-
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="restaurant-outline" size={20} color={colors.streak} />
-                <Text style={styles.cardTitle}>Food</Text>
-                <Pressable
-                  onPress={() => router.push('/food-form')}
-                  style={({ pressed }) => [styles.addFood, pressed && styles.pressed]}
-                  accessibilityRole="button"
-                >
-                  <Ionicons name="add" size={18} color={colors.onAccent} />
-                  <Text style={styles.addFoodText}>Add food</Text>
-                </Pressable>
-              </View>
-
-              <View style={styles.macros}>
-                <View style={styles.macro}>
-                  <Text style={styles.macroLabel}>Calories</Text>
-                  <Text style={styles.macroValue}>
-                    {fmt(calories)}
-                    <Text style={styles.macroGoal}> / {fmt(settings.calorieGoal)}</Text>
-                  </Text>
-                  <Bar value={calories / settings.calorieGoal} color={colors.streak} />
                 </View>
-                <View style={styles.macro}>
-                  <Text style={styles.macroLabel}>Protein</Text>
-                  <Text style={styles.macroValue}>
-                    {fmt(protein)} g
-                    <Text style={styles.macroGoal}> / {fmt(settings.proteinGoal)} g</Text>
-                  </Text>
-                  <Bar value={protein / settings.proteinGoal} color={colors.accent} />
+                <View style={styles.chart}>
+                  <ProgressChart
+                    points={waterWeek}
+                    max={settings.waterGoalMl}
+                    format={(v) => `${fmt(v)} ml`}
+                    gridLabels={[
+                      `${fmt(settings.waterGoalMl)}`,
+                      `${fmt(settings.waterGoalMl / 2)}`,
+                      '0',
+                    ]}
+                  />
                 </View>
               </View>
+            )}
 
-              {food.length === 0 && <Text style={styles.sub}>Nothing logged yet today.</Text>}
-              {MEALS.map(([meal, label]) => {
-                const items = food.filter((f) => f.meal === meal);
-                if (items.length === 0) return null;
-                return (
-                  <View key={meal} style={styles.meal}>
-                    <Text style={styles.mealTitle}>
-                      {label} · {fmt(items.reduce((s, f) => s + f.calories, 0))} kcal
+            {trackGym && (
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Ionicons name="barbell-outline" size={20} color={colors.accent} />
+                  <Text style={styles.cardTitle}>Gym</Text>
+                </View>
+                <Text style={styles.big}>
+                  {gymWeek.length}
+                  <Text style={styles.bigUnit}>
+                    {' '}
+                    {gymWeek.length === 1 ? 'session' : 'sessions'} in the last 7 days
+                  </Text>
+                </Text>
+                {gymWeekMin > 0 && (
+                  <Text style={styles.sub}>{formatDuration(gymWeekMin)} in total</Text>
+                )}
+                <View style={styles.quickRow}>
+                  {GYM_MINUTES.map((m) => (
+                    <Pressable
+                      key={m}
+                      onPress={() => logGym(m)}
+                      style={({ pressed }) => [styles.quick, pressed && styles.pressed]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Log a ${m} minute session`}
+                    >
+                      <Text style={styles.quickText}>{m} min</Text>
+                    </Pressable>
+                  ))}
+                  <Pressable
+                    onPress={() => lastGymToday && removeGym(lastGymToday.id)}
+                    style={({ pressed }) => [
+                      styles.undo,
+                      !lastGymToday && styles.disabled,
+                      pressed && styles.pressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Undo last session"
+                  >
+                    <Ionicons name="arrow-undo-outline" size={18} color={colors.text} />
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {trackFood && !isPro && (
+              <ProLock
+                title="Track your calories"
+                body="Record meals with calories and protein, let AI estimate them, and see how you're doing against your daily goals."
+              />
+            )}
+
+            {foodOn && (
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <Ionicons name="restaurant-outline" size={20} color={colors.streak} />
+                  <Text style={styles.cardTitle}>Food</Text>
+                  <Pressable
+                    onPress={() => router.push('/food-form')}
+                    style={({ pressed }) => [styles.addFood, pressed && styles.pressed]}
+                    accessibilityRole="button"
+                  >
+                    <Ionicons name="add" size={18} color={colors.onAccent} />
+                    <Text style={styles.addFoodText}>Add food</Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.macros}>
+                  <View style={styles.macro}>
+                    <Text style={styles.macroLabel}>Calories</Text>
+                    <Text style={styles.macroValue}>
+                      {fmt(calories)}
+                      <Text style={styles.macroGoal}> / {fmt(settings.calorieGoal)}</Text>
                     </Text>
-                    {items.map((item) => (
-                      <View key={item.id} style={styles.foodRow}>
-                        <Text style={styles.foodName} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        <Text style={styles.foodMeta}>
-                          {fmt(item.calories)} kcal · {item.protein} g
-                        </Text>
-                        <Pressable
-                          onPress={() => removeFood(item.id)}
-                          hitSlop={8}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Remove ${item.name}`}
-                        >
-                          <Ionicons name="close" size={18} color={colors.textMuted} />
-                        </Pressable>
-                      </View>
-                    ))}
+                    <Bar value={calories / settings.calorieGoal} color={colors.streak} />
                   </View>
-                );
-              })}
+                  <View style={styles.macro}>
+                    <Text style={styles.macroLabel}>Protein</Text>
+                    <Text style={styles.macroValue}>
+                      {fmt(protein)} g
+                      <Text style={styles.macroGoal}> / {fmt(settings.proteinGoal)} g</Text>
+                    </Text>
+                    <Bar value={protein / settings.proteinGoal} color={colors.accent} />
+                  </View>
+                </View>
 
-              <Text style={[styles.mealTitle, styles.historyTitle]}>Calories, last 7 days</Text>
-              <View style={styles.chart}>
-                <ProgressChart
-                  points={foodWeek}
-                  max={settings.calorieGoal}
-                  format={(v) => `${fmt(v)} kcal`}
-                  gridLabels={[
-                    `${fmt(settings.calorieGoal)}`,
-                    `${fmt(settings.calorieGoal / 2)}`,
-                    '0',
-                  ]}
-                />
+                {food.length === 0 && <Text style={styles.sub}>Nothing logged yet today.</Text>}
+                {MEALS.map(([meal, label]) => {
+                  const items = food.filter((f) => f.meal === meal);
+                  if (items.length === 0) return null;
+                  return (
+                    <View key={meal} style={styles.meal}>
+                      <Text style={styles.mealTitle}>
+                        {label} · {fmt(items.reduce((s, f) => s + f.calories, 0))} kcal
+                      </Text>
+                      {items.map((item) => (
+                        <View key={item.id} style={styles.foodRow}>
+                          <Text style={styles.foodName} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <Text style={styles.foodMeta}>
+                            {fmt(item.calories)} kcal · {item.protein} g
+                          </Text>
+                          <Pressable
+                            onPress={() => removeFood(item.id)}
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Remove ${item.name}`}
+                          >
+                            <Ionicons name="close" size={18} color={colors.textMuted} />
+                          </Pressable>
+                        </View>
+                      ))}
+                    </View>
+                  );
+                })}
+
+                <Text style={[styles.mealTitle, styles.historyTitle]}>Calories, last 7 days</Text>
+                <View style={styles.chart}>
+                  <ProgressChart
+                    points={foodWeek}
+                    max={settings.calorieGoal}
+                    format={(v) => `${fmt(v)} kcal`}
+                    gridLabels={[
+                      `${fmt(settings.calorieGoal)}`,
+                      `${fmt(settings.calorieGoal / 2)}`,
+                      '0',
+                    ]}
+                  />
+                </View>
+                <Text style={styles.sub}>
+                  Protein this week: {fmt(proteinWeek)} g, about{' '}
+                  {fmt(proteinWeek / Math.max(1, loggedDays))} g a day on days you logged.
+                </Text>
               </View>
-              <Text style={styles.sub}>
-                Protein this week: {fmt(proteinWeek)} g, about{' '}
-                {fmt(proteinWeek / Math.max(1, loggedDays))} g a day on days you logged.
-              </Text>
-            </View>
+            )}
 
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Daily goals</Text>
-              <GoalStepper
-                label="Water"
-                value={settings.waterGoalMl}
-                unit="ml"
-                step={250}
-                min={500}
-                onChange={(v) => settings.update({ waterGoalMl: v })}
-              />
-              <GoalStepper
-                label="Calories"
-                value={settings.calorieGoal}
-                unit="kcal"
-                step={100}
-                min={800}
-                onChange={(v) => settings.update({ calorieGoal: v })}
-              />
-              <GoalStepper
-                label="Protein"
-                value={settings.proteinGoal}
-                unit="g"
-                step={10}
-                min={20}
-                onChange={(v) => settings.update({ proteinGoal: v })}
-              />
-            </View>
+            {(trackWater || foodOn) && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Daily goals</Text>
+                {trackWater && (
+                  <GoalStepper
+                    label="Water"
+                    value={settings.waterGoalMl}
+                    unit="ml"
+                    step={250}
+                    min={500}
+                    onChange={(v) => settings.update({ waterGoalMl: v })}
+                  />
+                )}
+                {foodOn && (
+                  <>
+                    <GoalStepper
+                      label="Calories"
+                      value={settings.calorieGoal}
+                      unit="kcal"
+                      step={100}
+                      min={800}
+                      onChange={(v) => settings.update({ calorieGoal: v })}
+                    />
+                    <GoalStepper
+                      label="Protein"
+                      value={settings.proteinGoal}
+                      unit="g"
+                      step={10}
+                      min={20}
+                      onChange={(v) => settings.update({ proteinGoal: v })}
+                    />
+                  </>
+                )}
+              </View>
+            )}
+
+            <Pressable onPress={() => setChoosing(true)} hitSlop={8} accessibilityRole="button">
+              <Text style={styles.changeLink}>Change what I track</Text>
+            </Pressable>
           </>
         )}
       </ScrollView>
@@ -292,6 +417,13 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 32,
     fontWeight: '600',
+  },
+  changeLink: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    paddingVertical: spacing.sm,
   },
   card: {
     backgroundColor: colors.card,
