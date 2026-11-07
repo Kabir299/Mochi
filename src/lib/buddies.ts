@@ -1,7 +1,6 @@
 import { addDays, DateKey, toDateKey } from '@/lib/dates';
 
-// What a friend sees: only what the person chose to send, as a code they pass on themselves.
-// No accounts and no server; nothing updates until a new code is shared.
+// What a friend sees: only what the person chose to send.
 export type BuddySnapshot = {
   name: string;
   day: DateKey;
@@ -11,19 +10,8 @@ export type BuddySnapshot = {
   habits: { name: string; rate: number; streak: number }[];
 };
 
-const PREFIX = 'MOCHI1-';
-const MAX_CODE_LENGTH = 20_000;
-const MAX_HABITS = 50;
+export const MAX_SHARED_HABITS = 50;
 const MAX_NAME = 40;
-
-export function encodeSnapshot(snapshot: BuddySnapshot) {
-  const json = JSON.stringify(snapshot);
-  // btoa only takes single bytes, so names in any language go through URI escapes first.
-  const bytes = encodeURIComponent(json).replace(/%([0-9A-F]{2})/g, (_, hex) =>
-    String.fromCharCode(parseInt(hex, 16)),
-  );
-  return PREFIX + btoa(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
 
 const clampRate = (value: unknown) =>
   typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
@@ -34,53 +22,28 @@ const clampCount = (value: unknown) =>
 const cleanName = (value: unknown) =>
   typeof value === 'string' ? value.trim().slice(0, MAX_NAME) : '';
 
-// Accepts the whole shared message. The code comes from someone else, so every field is checked
-// and limited; anything malformed gives null.
-export function decodeSnapshot(text: string): BuddySnapshot | null {
-  const match = /MOCHI1-([A-Za-z0-9_-]+)/.exec(text);
-  if (!match || match[1].length > MAX_CODE_LENGTH) return null;
-  try {
-    const bytes = atob(match[1].replace(/-/g, '+').replace(/_/g, '/'));
-    const escaped = Array.from(
-      bytes,
-      (c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'),
-    ).join('');
-    const raw = JSON.parse(decodeURIComponent(escaped));
-    const name = cleanName(raw?.name);
-    const day = typeof raw?.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.day) ? raw.day : null;
-    if (!name || !day || !Array.isArray(raw.week) || !Array.isArray(raw.habits)) return null;
-    return {
-      name,
-      day,
-      streak: clampCount(raw.streak),
-      week: raw.week.slice(-7).map((v: unknown) => (v === null ? null : clampRate(v))),
-      habits: raw.habits
-        .slice(0, MAX_HABITS)
-        .map((h: { name?: unknown; rate?: unknown; streak?: unknown }) => ({
-          name: cleanName(h?.name),
-          rate: clampRate(h?.rate),
-          streak: clampCount(h?.streak),
-        }))
-        .filter((h: { name: string }) => h.name !== ''),
-    };
-  } catch {
-    return null;
-  }
-}
-
-// Saved buddies, kept in settings as JSON. Sending a newer code replaces the old one.
-export function parseBuddies(raw: string): BuddySnapshot[] {
-  try {
-    const list = JSON.parse(raw);
-    return Array.isArray(list) ? list : [];
-  } catch {
-    return [];
-  }
-}
-
-export function addBuddy(list: BuddySnapshot[], buddy: BuddySnapshot) {
-  const same = (b: BuddySnapshot) => b.name.toLowerCase() === buddy.name.toLowerCase();
-  return [...list.filter((b) => !same(b)), buddy];
+// An update comes from someone else's phone, so every field is checked and limited; anything
+// malformed gives null.
+export function cleanSnapshot(raw: unknown): BuddySnapshot | null {
+  const data = raw as Partial<Record<keyof BuddySnapshot, unknown>> | null;
+  const name = cleanName(data?.name);
+  const day =
+    typeof data?.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.day) ? data.day : null;
+  if (!name || !day || !Array.isArray(data?.week) || !Array.isArray(data?.habits)) return null;
+  return {
+    name,
+    day,
+    streak: clampCount(data.streak),
+    week: data.week.slice(-7).map((v: unknown) => (v === null ? null : clampRate(v))),
+    habits: data.habits
+      .slice(0, MAX_SHARED_HABITS)
+      .map((h: { name?: unknown; rate?: unknown; streak?: unknown }) => ({
+        name: cleanName(h?.name),
+        rate: clampRate(h?.rate),
+        streak: clampCount(h?.streak),
+      }))
+      .filter((h: { name: string }) => h.name !== ''),
+  };
 }
 
 export function weekAverage(week: (number | null)[]) {

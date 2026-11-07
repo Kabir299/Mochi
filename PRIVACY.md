@@ -33,11 +33,24 @@ a count of requests per IP address in memory; it is not written to disk.
 
 ## Buddies
 
-Sharing with a buddy is something you start. You choose which habits to include, and Mochi makes a
-code holding your name, this week's progress and those habits' names, rates and streaks. It leaves
-your phone only when you send it yourself, through an app you pick, and Mochi's server is not
-involved. A code you paste from a friend is stored only on your phone. The AI buddy is worked out
-on your phone from your own history, and nothing about it is sent anywhere.
+Buddies are something you choose to set up, and nothing is sent until you do. When you link with a
+friend, you choose what they see: your name, overall progress and streak for the last week, plus
+the names, rates and streaks of all your repeating habits or only the ones you pick. You can change
+this for each friend at any time.
+
+These updates are encrypted on your phone before they leave it and stored on our database provider
+(Supabase) until your friend's phone collects them. Only the latest update is kept. The key is in
+the invite you send your friend and is never sent to us, so we can't read them. We do store a
+random ID for your phone (only its hash), which phones are linked, and when an update was sent, and
+as with any internet service the provider can see your IP address when your phone connects.
+
+Removing a buddy deletes the link and both people's stored updates at once. If you are offline,
+this happens the next time you connect. Delete all data does the same for all your buddies when you
+have a connection. Anything left behind is deleted after 6 months without use. A backup file
+includes your buddy links and their keys, so keep it somewhere private.
+
+The AI buddy is worked out on your phone from your own history, and nothing about it is sent
+anywhere.
 
 ## Purchases
 
@@ -57,7 +70,7 @@ Reminders are scheduled on your phone. Nothing about them is sent to us.
 ## Things the app does not do
 
 - No accounts, ads, analytics or tracking SDKs
-- No selling or sharing of data with anyone except the AI provider and RevenueCat, as above
+- No selling or sharing of data with anyone except the AI provider, RevenueCat and Supabase, as above
 - Not intended for children under 13
 
 ## Changes and contact

@@ -11,6 +11,7 @@ import { PurchasesSync } from '@/components/PurchasesSync';
 import { ReminderSync } from '@/components/ReminderSync';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/lib/db';
 import { applyKey, DbChoice, prepareDatabase } from '@/lib/secureDb';
+import { BuddySyncProvider } from '@/state/buddySync';
 import { HabitsProvider } from '@/state/habits';
 import { NutritionProvider } from '@/state/nutrition';
 import { SettingsProvider, useSettings } from '@/state/settings';
@@ -90,7 +91,9 @@ export default function RootLayout() {
             <NutritionProvider>
               <ReminderSync />
               <PurchasesSync />
-              <ThemedScreens />
+              <BuddySyncProvider>
+                <ThemedScreens />
+              </BuddySyncProvider>
             </NutritionProvider>
           </HabitsProvider>
         </SettingsProvider>

@@ -145,3 +145,16 @@ Build this first. Android only; it needs a development build, so Expo Go stops b
 - Reminders only work in the phone app, not the browser preview
 - In the browser preview the app can only be open in one tab at a time (phones are unaffected)
 - Pro is unlocked for free in test mode
+
+## Live buddies setup
+
+1. Create a free project at supabase.com. The password it asks for is the database's; keep it in
+   your password manager.
+2. Open SQL Editor, paste all of `supabase/schema.sql` and press Run.
+3. Run `scripts/set-buddy-keys.ps1` and paste the Project URL and publishable key from Settings ->
+   API Keys. Never use the secret key.
+4. Build the app. Builds made before step 3 show "Live buddies aren't set up".
+
+A free project can pause after about a week without activity. If buddies show "Can't reach the
+server", restore it from the Supabase dashboard. Before release, add Supabase to the store's
+data-safety forms and fill in the blanks in PRIVACY.md.

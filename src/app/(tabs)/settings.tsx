@@ -24,6 +24,7 @@ import { saveBackup } from '@/lib/backup';
 import { allowExactTiming, remindersSupported, requestReminderPermission } from '@/lib/reminders';
 import { useHabits } from '@/state/habits';
 import { useNutrition } from '@/state/nutrition';
+import { useBuddySync } from '@/state/buddySync';
 import { FREE_LAUNCH, useSettings } from '@/state/settings';
 import { useExactTiming } from '@/state/useExactTiming';
 import { useRestoreBackup } from '@/state/useRestoreBackup';
@@ -61,6 +62,7 @@ const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL;
 export default function SettingsScreen() {
   const database = useSQLiteContext();
   const settings = useSettings();
+  const { forgetAll: forgetBuddies } = useBuddySync();
   const { archivedHabits, archiveHabit, removeHabit, reload } = useHabits();
   const nutrition = useNutrition();
   const [petName, setPetName] = useState(settings.petName);
@@ -108,10 +110,11 @@ export default function SettingsScreen() {
   const resetAll = async () => {
     const ok = await confirmDestructive(
       'Delete all data?',
-      'Every habit, check-in, note, water, food and gym log will be erased from this phone. This can’t be undone.',
+      'Every habit, check-in, note, water, food and gym log will be erased from this phone, and your buddies will be unlinked. This can’t be undone.',
       'Delete everything',
     );
     if (!ok) return;
+    await forgetBuddies();
     await db.deleteAllData(database);
     await Promise.all([reload(), nutrition.reload()]);
     // Back to the setup questions, like a fresh install.
@@ -270,6 +273,9 @@ export default function SettingsScreen() {
           <Text style={styles.privacy}>
             No accounts, ads or tracking. Mochi gives general wellness tips, not medical advice;
             calorie and protein numbers are estimates.
+          </Text>
+          <Text style={styles.privacy}>
+            Buddies you link with get only what you choose, encrypted so we can’t read it.
           </Text>
           {lockSupported && (
             <ToggleRow

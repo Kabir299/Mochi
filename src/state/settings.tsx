@@ -62,9 +62,11 @@ export type Settings = {
   trackGym: boolean;
   // Light, dark, or whatever the phone is set to.
   theme: ThemeChoice;
-  // Friends' shared progress as JSON (see lib/buddies.ts), and the name you share under.
-  buddies: string;
+  // Friends and invites as JSON (see lib/buddyLinks.ts), and the name you share under.
+  buddyLinks: string;
   shareName: string;
+  // Identifies this phone to the buddy server; made the first time you link with someone.
+  syncSecret: string;
   // The day the AI buddy was turned on, or '' when it's off.
   aiBuddySince: string;
   aiBuddyName: string;
@@ -100,8 +102,9 @@ const DEFAULTS: Settings = {
   trackWater: false,
   trackGym: false,
   theme: 'system',
-  buddies: '',
+  buddyLinks: '',
   shareName: '',
+  syncSecret: '',
   aiBuddySince: '',
   aiBuddyName: 'Kumo',
 };
@@ -155,8 +158,9 @@ function parse(raw: Record<string, string>): Settings {
     trackWater: raw.trackWater === '1',
     trackGym: raw.trackGym === '1',
     theme: raw.theme === 'light' || raw.theme === 'dark' ? raw.theme : DEFAULTS.theme,
-    buddies: raw.buddies ?? '',
+    buddyLinks: raw.buddyLinks ?? '',
     shareName: raw.shareName ?? '',
+    syncSecret: raw.syncSecret ?? '',
     aiBuddySince: raw.aiBuddySince ?? '',
     aiBuddyName: raw.aiBuddyName || DEFAULTS.aiBuddyName,
     profile: raw.profile ?? '',

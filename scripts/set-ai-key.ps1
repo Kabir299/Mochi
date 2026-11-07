@@ -10,10 +10,15 @@ $key = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
 if ($key.Length -lt 16) { throw 'That looks too short. Copy the whole APP_KEY value and run this again.' }
 
 $root = Split-Path -Parent $PSScriptRoot
-[IO.File]::WriteAllLines((Join-Path $root '.env'), @(
+$envFile = Join-Path $root '.env'
+$kept = @()
+if (Test-Path $envFile) {
+  $kept = @(Get-Content $envFile | Where-Object { $_ -notmatch '^EXPO_PUBLIC_(AI_URL|APP_KEY)=' })
+}
+[IO.File]::WriteAllLines($envFile, [string[]]($kept + @(
   "EXPO_PUBLIC_AI_URL=$url",
   "EXPO_PUBLIC_APP_KEY=$key"
-), (New-Object Text.UTF8Encoding $false))
+)), (New-Object Text.UTF8Encoding $false))
 Write-Host 'Saved to .env for local testing.'
 
 Push-Location $root
