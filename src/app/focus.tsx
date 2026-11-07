@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Pressable, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -14,7 +14,7 @@ import { closeModal } from '@/lib/nav';
 import { cancelFocusEnd, scheduleFocusEnd } from '@/lib/reminders';
 import { useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 const LENGTHS = [15, 25, 45, 60];
 const DEFAULT_LENGTH = 25;
@@ -282,7 +282,7 @@ function FocusTimer({ habitId, day }: { habitId: number; day: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -415,4 +415,4 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 16,
   },
-});
+}));

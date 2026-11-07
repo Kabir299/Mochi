@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { DateKey, fromDateKey, toDateKey } from '@/lib/dates';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 type Props = {
   visible: boolean;
@@ -104,7 +104,7 @@ export function MonthCalendar({ visible, selected, today, dayStatus, onSelect, o
 
 const CELL = `${100 / 7}%` as const;
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -179,4 +179,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-});
+}));

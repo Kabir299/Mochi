@@ -11,6 +11,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 
 import * as db from '@/lib/db';
 import { paymentsEnabled } from '@/lib/purchases';
+import type { ThemeChoice } from '@/theme';
 
 export type Settings = {
   // Has an active Pro subscription (see lib/purchases.ts), or FREE_LAUNCH.
@@ -59,6 +60,14 @@ export type Settings = {
   trackFood: boolean;
   trackWater: boolean;
   trackGym: boolean;
+  // Light, dark, or whatever the phone is set to.
+  theme: ThemeChoice;
+  // Friends' shared progress as JSON (see lib/buddies.ts), and the name you share under.
+  buddies: string;
+  shareName: string;
+  // The day the AI buddy was turned on, or '' when it's off.
+  aiBuddySince: string;
+  aiBuddyName: string;
 };
 
 const DEFAULTS: Settings = {
@@ -90,6 +99,11 @@ const DEFAULTS: Settings = {
   trackFood: false,
   trackWater: false,
   trackGym: false,
+  theme: 'system',
+  buddies: '',
+  shareName: '',
+  aiBuddySince: '',
+  aiBuddyName: 'Kumo',
 };
 
 type SettingsContextValue = Settings & {
@@ -140,6 +154,11 @@ function parse(raw: Record<string, string>): Settings {
     trackFood: raw.trackFood === '1',
     trackWater: raw.trackWater === '1',
     trackGym: raw.trackGym === '1',
+    theme: raw.theme === 'light' || raw.theme === 'dark' ? raw.theme : DEFAULTS.theme,
+    buddies: raw.buddies ?? '',
+    shareName: raw.shareName ?? '',
+    aiBuddySince: raw.aiBuddySince ?? '',
+    aiBuddyName: raw.aiBuddyName || DEFAULTS.aiBuddyName,
     profile: raw.profile ?? '',
   };
 }

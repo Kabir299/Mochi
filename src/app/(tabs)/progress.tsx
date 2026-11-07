@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,7 +14,7 @@ import { computeDayStreak, streakProgress } from '@/lib/streak';
 import { useSettings } from '@/state/settings';
 import { average, habitStats, insights, pct, points1, series } from '@/lib/stats';
 import { useHabits } from '@/state/habits';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 type Range = '7' | '30';
 const RANGES = [
@@ -85,6 +85,19 @@ export default function ProgressScreen() {
         </View>
 
         <Segmented options={RANGES} value={range} onChange={setRange} />
+
+        <Pressable
+          onPress={() => router.push('/buddies')}
+          style={styles.buddies}
+          accessibilityRole="button"
+        >
+          <Ionicons name="people-outline" size={20} color={colors.accent} />
+          <View style={styles.buddiesText}>
+            <Text style={styles.buddiesTitle}>Buddies</Text>
+            <Text style={styles.buddiesHint}>Share progress with friends or race an AI buddy</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </Pressable>
 
         {habits.length === 0 ? (
           <View style={styles.card}>
@@ -224,7 +237,27 @@ export default function ProgressScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
+  buddies: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+    padding: spacing.md,
+  },
+  buddiesText: {
+    flex: 1,
+  },
+  buddiesTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  buddiesHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+  },
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -420,4 +453,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-});
+}));

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { DayPoint } from '@/lib/stats';
-import { colors } from '@/theme';
+import { colors, themedStyles } from '@/theme';
 
 type Props = {
   points: DayPoint[];
@@ -112,7 +112,7 @@ export function ProgressChart({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   readout: {
     color: colors.textMuted,
     fontSize: 13,
@@ -171,4 +171,4 @@ const styles = StyleSheet.create({
   xLabelActive: {
     color: colors.text,
   },
-});
+}));

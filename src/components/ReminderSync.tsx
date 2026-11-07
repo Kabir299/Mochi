@@ -1,14 +1,17 @@
 import { useEffect } from 'react';
 
-import { toDateKey } from '@/lib/dates';
+import { addDays, toDateKey } from '@/lib/dates';
+import { REMINDER_DAYS } from '@/lib/reminderPlan';
 import { syncReminders } from '@/lib/reminders';
-import { useHabits } from '@/state/habits';
+import { useToday } from '@/lib/useToday';
+import { isScheduled, useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
 import { useExactTiming } from '@/state/useExactTiming';
 
 // Keeps scheduled notifications in step with habits and settings.
 export function ReminderSync() {
-  const { loaded, habits, dayProgress } = useHabits();
+  const { loaded, habits, dayProgress, isDone } = useHabits();
+  const today = useToday();
   const settings = useSettings();
   // Alarms set before exact timing was allowed stay approximate, so reschedule when it changes.
   const exact = useExactTiming();
@@ -18,8 +21,21 @@ export function ReminderSync() {
   const streakSecured =
     restToday || (dayProgress(toDateKey(new Date())) ?? 0) >= settings.streakThreshold;
 
-  // Only what affects the schedule, so ordinary taps don't reschedule.
+  // Finished tasks don't get reminders, so ticking or unticking one reschedules.
+  const finished: string[] = [];
+  for (let offset = 0; offset < REMINDER_DAYS; offset++) {
+    const day = toDateKey(addDays(today, offset));
+    for (const h of habits) {
+      if (h.startMinute !== null && isScheduled(h, day) && isDone(h, day)) {
+        finished.push(`${h.id}:${day}`);
+      }
+    }
+  }
+
+  // Only what affects the schedule, so other taps don't reschedule.
   const signature = JSON.stringify([
+    toDateKey(today),
+    finished,
     habits.map((h) => [h.id, h.name, h.repeat, h.days, h.onceDay, h.startMinute, h.durationMin]),
     settings.remindersOn,
     settings.streakNudge,
@@ -34,6 +50,8 @@ export function ReminderSync() {
     if (!loaded || !settings.loaded) return;
     syncReminders({
       habits,
+      isScheduled,
+      isDone,
       remindersOn: settings.remindersOn,
       streakNudge: settings.streakNudge,
       streakSecured,

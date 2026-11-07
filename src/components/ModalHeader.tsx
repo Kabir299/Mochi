@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { closeModal } from '@/lib/nav';
-import { colors, spacing } from '@/theme';
+import { colors, spacing, themedStyles } from '@/theme';
 
 type Props = {
   title: string;
@@ -22,7 +22,7 @@ export function ModalHeader({ title, leftLabel = 'Close', right }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -47,4 +47,4 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 16,
   },
-});
+}));

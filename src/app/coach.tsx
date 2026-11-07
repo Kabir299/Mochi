@@ -19,7 +19,7 @@ import { ProLock } from '@/components/ProLock';
 import { ChatMessage, requestChat } from '@/lib/ai';
 import { useSettings } from '@/state/settings';
 import { useAiPayload } from '@/state/useAiPayload';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 const STARTERS = [
   'Why do I keep missing workouts?',
@@ -130,7 +130,7 @@ export default function CoachScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -231,4 +231,4 @@ const styles = StyleSheet.create({
   sendDisabled: {
     opacity: 0.4,
   },
-});
+}));

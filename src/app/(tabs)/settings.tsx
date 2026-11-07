@@ -5,7 +5,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Switch,
   Text,
   TextInput,
@@ -28,7 +27,13 @@ import { useNutrition } from '@/state/nutrition';
 import { FREE_LAUNCH, useSettings } from '@/state/settings';
 import { useExactTiming } from '@/state/useExactTiming';
 import { useRestoreBackup } from '@/state/useRestoreBackup';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
+
+const THEMES = [
+  ['system', 'System'],
+  ['light', 'Light'],
+  ['dark', 'Dark'],
+] as const;
 
 const THRESHOLDS = [
   ['0.6', '60%'],
@@ -111,6 +116,8 @@ export default function SettingsScreen() {
     await Promise.all([reload(), nutrition.reload()]);
     // Back to the setup questions, like a fresh install.
     await settings.update({ petName: 'Mochi', onboarded: false });
+    // Everything else on screen, like buddies and the theme, goes back to its default too.
+    await settings.reload();
     setPetName('Mochi');
   };
 
@@ -118,6 +125,14 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Settings</Text>
+
+        <Section title="Appearance">
+          <Segmented
+            options={THEMES}
+            value={settings.theme}
+            onChange={(theme) => settings.update({ theme })}
+          />
+        </Section>
 
         <Section title="Streak">
           <Text style={styles.label}>Daily progress needed to keep the streak</Text>
@@ -423,7 +438,7 @@ function Stepper({ value, onChange }: { value: number; onChange: (value: number)
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -563,4 +578,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-});
+}));

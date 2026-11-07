@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, Switch, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import {
@@ -12,7 +12,7 @@ import {
 } from '@/lib/profile';
 import { useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 // "Do you also have a body goal?" Shown on the Health tab the first time, and again
 // from the small Body goal row. Sets calorie / protein / water targets and can add
@@ -134,7 +134,7 @@ export function BodyGoalCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.card,
@@ -189,4 +189,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   rowText: { flex: 1, color: colors.text, fontSize: 14 },
-});
+}));

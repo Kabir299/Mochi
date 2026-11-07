@@ -31,6 +31,14 @@ requests or use them for advertising. The providers process them under their own
 which do not allow training on API data by default. To stop abuse, the server briefly keeps
 a count of requests per IP address in memory; it is not written to disk.
 
+## Buddies
+
+Sharing with a buddy is something you start. You choose which habits to include, and Mochi makes a
+code holding your name, this week's progress and those habits' names, rates and streaks. It leaves
+your phone only when you send it yourself, through an app you pick, and Mochi's server is not
+involved. A code you paste from a friend is stored only on your phone. The AI buddy is worked out
+on your phone from your own history, and nothing about it is sent anywhere.
+
 ## Purchases
 
 Mochi Pro is bought through the App Store or Google Play; we never see your card details.

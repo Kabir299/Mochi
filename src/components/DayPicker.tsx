@@ -1,9 +1,9 @@
 import { ComponentRef, useEffect, useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { addDays, DateKey, fromDateKey, toDateKey } from '@/lib/dates';
-import { colors, radius } from '@/theme';
+import { colors, radius, themedStyles } from '@/theme';
 
 type Props = {
   today: Date;
@@ -83,7 +83,7 @@ export function DayPicker({ today, selected, onSelect, isDayComplete, isFrozen }
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: {
     gap: ITEM_GAP,
     paddingVertical: 2,
@@ -132,4 +132,4 @@ const styles = StyleSheet.create({
   dateFuture: {
     color: colors.iconMuted,
   },
-});
+}));

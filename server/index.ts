@@ -241,7 +241,10 @@ would really help.`,
     system: `You estimate calories and protein for a meal someone describes in a food
 tracker. Assume typical home or restaurant portions when no amount is given, and the
 user's local cuisine when a dish is ambiguous (for example Indian home cooking for "dal").
-Give realistic everyday estimates, not ranges.`,
+People type quickly, often without commas and with typos. Work out the separate foods yourself:
+"cheese naan with gravy 100g" means one cheese naan plus 100 g of gravy, and an amount belongs
+to the food next to it. If you don't recognise a dish, estimate from its likely ingredients;
+never leave a food out or answer with zero. Give realistic everyday estimates, not ranges.`,
     prompt: (body) => `Estimate this meal.\n\n${JSON.stringify(body)}`,
   },
   '/brain-dump': {

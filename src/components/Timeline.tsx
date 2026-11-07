@@ -1,10 +1,10 @@
 import { Fragment, ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { formatDuration, formatMinute } from '@/lib/dates';
 import type { Habit } from '@/state/habits';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 type Props = {
   habits: Habit[];
@@ -85,7 +85,7 @@ export function Timeline({ habits, isDone, nowMinute, renderRow }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: {
     flexDirection: 'row',
     alignItems: 'stretch',
@@ -156,4 +156,4 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-});
+}));

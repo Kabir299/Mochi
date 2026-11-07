@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, View } from 'react-native';
 
 import type { Mood } from '@/lib/encouragement';
 import { autoItem, colorFor, PetItem } from '@/lib/wardrobe';
 import { useSettings } from '@/state/settings';
+import { themedStyles } from '@/theme';
 
 // Sad and sleepy moods fade the chosen colour so the mood still reads.
 const MOOD_TINT: Partial<Record<Mood, string>> = {
@@ -111,7 +112,7 @@ export function Pet({
 
 const INK = '#1A1A22';
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   sprout: {
     position: 'absolute',
     top: -9,
@@ -261,4 +262,4 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     backgroundColor: INK,
   },
-});
+}));

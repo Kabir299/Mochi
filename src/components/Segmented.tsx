@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 type Props<T extends string> = {
   options: readonly (readonly [T, string])[];
@@ -29,7 +29,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Props<
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   segment: {
     flexDirection: 'row',
     backgroundColor: colors.card,
@@ -53,4 +53,4 @@ const styles = StyleSheet.create({
   textActive: {
     color: colors.text,
   },
-});
+}));

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { ComponentRef, useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -8,11 +8,11 @@ import { ActionSheet, SheetAction } from '@/components/ActionSheet';
 import { Confetti } from '@/components/Confetti';
 import { UndoToast } from '@/components/UndoToast';
 import { DayPicker } from '@/components/DayPicker';
-import { Guide, GuideStep } from '@/components/Guide';
 import { HabitRow } from '@/components/HabitRow';
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { Pet } from '@/components/Pet';
 import { Segmented } from '@/components/Segmented';
+import { Spotlight } from '@/components/Spotlight';
 import { Timeline } from '@/components/Timeline';
 import { WeekGrid } from '@/components/WeekGrid';
 import { confirmAction, confirmDestructive } from '@/lib/confirm';
@@ -33,7 +33,7 @@ import { computeDayStreak, streakProgress } from '@/lib/streak';
 import { Habit, useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
 import { useRestoreBackup } from '@/state/useRestoreBackup';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 const openNewHabit = (day?: DateKey) =>
   router.push(day ? { pathname: '/habit-form', params: { day } } : '/habit-form');
@@ -45,6 +45,7 @@ const VIEWS = [
   ['week', 'Week'],
 ] as const;
 type ViewMode = (typeof VIEWS)[number][0];
+type TourStep = 'add' | 'tick' | 'end';
 
 const MILESTONES = [1, 3, 7, 30, 100, 365];
 // Unfinished one-off tasks from this many days back are offered again today.
@@ -277,39 +278,6 @@ export default function TodayScreen() {
     return list;
   };
 
-  const guideSteps: GuideStep[] = [
-    {
-      icon: 'add',
-      title: 'Add a task',
-      body: 'Tap + at the top right. Tell me what it is, when, and for how long.',
-    },
-    {
-      icon: 'checkmark-circle-outline',
-      title: 'Tick it off',
-      body: 'Tap a task when it’s done. Your day fills up, and I cheer you on.',
-    },
-    {
-      icon: 'ellipsis-vertical',
-      title: 'More on each task',
-      body: 'Tap ⋮ on a task for the focus timer, notes, editing and more.',
-    },
-    {
-      icon: 'flame-outline',
-      title: 'Keep your streak',
-      body: `Reach ${thresholdPct}% of your day to keep your streak going. Freezes cover the odd missed day.`,
-    },
-    {
-      icon: 'sparkles-outline',
-      title: 'Let AI help',
-      body: `Tap ✨ to plan your day, review your habits or chat with your coach.${settings.isPro ? '' : ' Part of Pro.'}`,
-    },
-    {
-      icon: 'settings-outline',
-      title: 'Your data, your phone',
-      body: 'Progress shows your trends. Settings has reminders and backups, and you can restore data from an old phone there any time.',
-    },
-  ];
-
   const aiActions: SheetAction[] = [
     {
       icon: 'analytics-outline',
@@ -328,11 +296,63 @@ export default function TodayScreen() {
     },
   ];
 
+  // The first-run walkthrough has the person do each thing for real. Steps move on by
+  // watching for the result: a new task, a check-in, the menu opening.
+  const tourOn = loaded && settings.loaded && !settings.guideSeen;
+  const [tourStep, setTourStep] = useState<TourStep>('add');
+  // Highest task id when the tour began, to spot the one they add, and that task.
+  const [tourBase, setTourBase] = useState<number | null>(null);
+  const [tourHabit, setTourHabit] = useState<number | null>(null);
+  const [layoutTick, setLayoutTick] = useState(0);
+  const addRef = useRef<ComponentRef<typeof View>>(null);
+  const rowRef = useRef<ComponentRef<typeof View>>(null);
+  const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
+  const scrollY = useRef(0);
+
+  if (!tourOn) {
+    if (tourBase !== null) {
+      setTourBase(null);
+      setTourStep('add');
+      setTourHabit(null);
+    }
+  } else if (tourBase === null) {
+    setTourBase(habits.reduce((max, h) => Math.max(max, h.id), 0));
+    setSelected(todayKey);
+    setView('day');
+  } else if (tourStep === 'add') {
+    if (habits.some((h) => h.id > tourBase)) {
+      const added = dayHabits.filter((h) => h.id > tourBase).pop();
+      setTourHabit(added?.id ?? null);
+      setTourStep(added ? 'tick' : 'end');
+    }
+  } else if (tourStep === 'tick') {
+    if (tourHabit === null || countFor(tourHabit, selected) > 0) setTourStep('end');
+  }
+
+  const finishTour = () => settings.update({ guideSeen: true });
+  const tour = {
+    add: {
+      title: 'Add a task',
+      body: 'Tap +. I’ve filled it in, so just tap through.',
+    },
+    tick: {
+      title: 'Now tick it off',
+      body: 'Tap the circle on your task.',
+    },
+    end: {
+      title: 'You’re all set!',
+      body: `Finish ${thresholdPct}% of your day to keep your streak. ⋮ on a task opens the focus timer, ✨ plans your day.`,
+      nextLabel: 'Got it',
+      onNext: finishTour,
+    },
+  }[tourStep];
+
   const row = (habit: Habit, minHeight?: number, variant?: 'card' | 'timeline') => {
     const entry = entryFor(habit.id, selected);
     return (
       <HabitRow
         key={habit.id}
+        rootRef={tourOn && habit.id === tourHabit ? rowRef : undefined}
         habit={habit}
         count={countFor(habit.id, selected)}
         streak={streakFor(habit, isFuture ? today : selectedDate)}
@@ -354,7 +374,15 @@ export default function TodayScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        ref={scroller}
+        contentContainerStyle={styles.content}
+        scrollEventThrottle={32}
+        onScroll={(e) => {
+          scrollY.current = e.nativeEvent.contentOffset.y;
+        }}
+        onContentSizeChange={() => tourOn && setLayoutTick((n) => n + 1)}
+      >
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={styles.title}>{dayTitle(selected, todayKey)}</Text>
@@ -370,6 +398,7 @@ export default function TodayScreen() {
               <Ionicons name="calendar-outline" size={20} color={colors.text} />
             </Pressable>
             <Pressable
+              collapsable={false}
               onPress={() => setAiMenu(true)}
               style={({ pressed }) => [styles.aiButton, pressed && styles.pressed]}
               accessibilityRole="button"
@@ -378,6 +407,8 @@ export default function TodayScreen() {
               <Ionicons name="sparkles-outline" size={20} color={colors.accent} />
             </Pressable>
             <Pressable
+              ref={addRef}
+              collapsable={false}
               onPress={() => openNewHabit(selected)}
               style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
               accessibilityRole="button"
@@ -616,8 +647,23 @@ export default function TodayScreen() {
         )}
       </ScrollView>
 
-      {settings.loaded && !settings.guideSeen && (
-        <Guide steps={guideSteps} onDone={() => settings.update({ guideSeen: true })} />
+      {tourOn && !menuHabit && !aiMenu && (
+        <Spotlight
+          stepKey={tourStep}
+          target={
+            tourStep === 'add'
+              ? addRef
+              : tourStep === 'tick'
+                ? rowRef
+                : undefined
+          }
+          refreshKey={layoutTick}
+          scrollBy={(dy) =>
+            scroller.current?.scrollTo({ y: scrollY.current + dy, animated: false })
+          }
+          onSkip={tourStep === 'end' ? undefined : finishTour}
+          {...tour}
+        />
       )}
       <ActionSheet
         visible={menuHabit !== null}
@@ -653,7 +699,7 @@ export default function TodayScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -957,4 +1003,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-});
+}));

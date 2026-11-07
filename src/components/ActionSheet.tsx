@@ -1,10 +1,10 @@
 import { ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { IconName } from '@/state/habits';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 export type SheetAction = {
   icon: IconName;
@@ -60,7 +60,7 @@ export function ActionSheet({ visible, title, actions, onClose, children }: Prop
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -102,4 +102,4 @@ const styles = StyleSheet.create({
   destructive: {
     color: colors.danger,
   },
-});
+}));

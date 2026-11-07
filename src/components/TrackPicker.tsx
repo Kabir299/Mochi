@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { IconName } from '@/state/habits';
 import { useNutrition } from '@/state/nutrition';
 import { useSettings } from '@/state/settings';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 type Choice = 'trackFood' | 'trackWater' | 'trackGym';
 
@@ -90,7 +90,7 @@ export function TrackPicker({ onDone }: { onDone: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.card,
@@ -162,4 +162,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
-});
+}));

@@ -4,10 +4,8 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,12 +32,14 @@ import { STARTER_HABITS } from '@/lib/starter';
 import { IconName, useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
 import { useRestoreBackup } from '@/state/useRestoreBackup';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 const WAKE_TIMES = [300, 330, 360, 390, 420, 450, 480, 540, 600];
 const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const FALLBACK_ICON: IconName = 'checkmark-circle-outline';
-const STEPS = 3;
+const STEPS = 2;
+// Ticked to start with, so setup can be just a couple of taps.
+const STARTER_GOALS: Profile['goals'] = ['workout', 'read', 'water'];
 
 // First launch: a few questions about the person, then a starting plan built
 // around them. Also reachable from Settings → Redo setup. The body goal is asked on
@@ -49,7 +49,7 @@ export default function OnboardingScreen() {
   const settings = useSettings();
   const { habits, addHabit } = useHabits();
   const [profile, setProfile] = useState<Profile>(
-    () => parseProfile(settings.profile) ?? DEFAULT_PROFILE,
+    () => parseProfile(settings.profile) ?? { ...DEFAULT_PROFILE, goals: STARTER_GOALS },
   );
   const [step, setStep] = useState(0);
   const [plan, setPlan] = useState<PlanHabit[]>([]);
@@ -191,7 +191,7 @@ export default function OnboardingScreen() {
             <Pet mood="happy" />
             <Text style={styles.title}>Hi, I’m {settings.petName}!</Text>
             <Text style={styles.lead}>
-              Answer a few quick questions and I’ll build your first plan around your goals.
+              Two quick taps and I’ll build your first plan. I’ve picked some answers to start with.
             </Text>
             <PrivacyNote text={PRIVACY_SHORT} />
             {!redo && (
@@ -204,8 +204,7 @@ export default function OnboardingScreen() {
 
         {step === 1 && (
           <>
-            <Text style={styles.title}>Which habits do you want to build?</Text>
-            <Text style={styles.lead}>Pick as many as you like.</Text>
+            <Text style={styles.title}>What do you want to build?</Text>
             <View style={styles.chips}>
               {GOALS.map((g) => {
                 const on = profile.goals.includes(g.id);
@@ -234,21 +233,6 @@ export default function OnboardingScreen() {
                 );
               })}
             </View>
-            <Text style={styles.label}>Anything else?</Text>
-            <TextInput
-              value={profile.other}
-              onChangeText={(other) => set({ other })}
-              placeholder="e.g. practise guitar, call my parents"
-              placeholderTextColor={colors.iconMuted}
-              style={styles.input}
-              maxLength={200}
-            />
-          </>
-        )}
-
-        {step === 2 && (
-          <>
-            <Text style={styles.title}>What does your day look like?</Text>
             <Text style={styles.label}>I usually wake up at</Text>
             <View style={styles.chips}>
               {WAKE_TIMES.map((m) => {
@@ -269,19 +253,27 @@ export default function OnboardingScreen() {
               })}
             </View>
             <Text style={styles.label}>Pace</Text>
-            {PACES.map((o) => (
-              <OptionCard
-                key={o.id}
-                label={o.label}
-                hint={o.hint}
-                on={profile.pace === o.id}
-                onPress={() => set({ pace: o.id })}
-              />
-            ))}
+            <View style={styles.chips}>
+              {PACES.map((o) => {
+                const on = profile.pace === o.id;
+                return (
+                  <Pressable
+                    key={o.id}
+                    onPress={() => set({ pace: o.id })}
+                    style={[styles.chip, on && styles.chipOn]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: on }}
+                  >
+                    <Text style={[styles.chipText, on && styles.chipTextOn]}>{o.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.hint}>{PACES.find((o) => o.id === profile.pace)?.hint}</Text>
           </>
         )}
 
-        {step === 3 && (
+        {step === 2 && (
           <>
             <Text style={styles.title}>Your starting plan</Text>
             {summary !== '' && <Text style={styles.lead}>{summary}</Text>}
@@ -387,38 +379,7 @@ export default function OnboardingScreen() {
   );
 }
 
-function OptionCard({
-  label,
-  hint,
-  on,
-  onPress,
-}: {
-  label: string;
-  hint: string;
-  on: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.option, on && styles.optionOn]}
-      accessibilityRole="radio"
-      accessibilityState={{ selected: on }}
-    >
-      <View style={styles.taskBody}>
-        <Text style={styles.taskName}>{label}</Text>
-        <Text style={styles.taskMeta}>{hint}</Text>
-      </View>
-      <Ionicons
-        name={on ? 'radio-button-on' : 'radio-button-off'}
-        size={20}
-        color={on ? colors.accent : colors.iconMuted}
-      />
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -510,26 +471,6 @@ const styles = StyleSheet.create({
   chipTextOn: {
     color: colors.onAccent,
     fontWeight: '600',
-  },
-  input: {
-    backgroundColor: colors.card,
-    borderRadius: radius.card,
-    color: colors.text,
-    fontSize: 16,
-    padding: spacing.md,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.card,
-    borderRadius: radius.card,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  optionOn: {
-    borderColor: colors.accent,
   },
   task: {
     flexDirection: 'row',
@@ -633,4 +574,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-});
+}));

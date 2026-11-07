@@ -10,7 +10,7 @@ import { Analysis, hasEnoughData, requestAnalysis } from '@/lib/ai';
 import { useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
 import { useAiPayload } from '@/state/useAiPayload';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 export default function AiAnalysisScreen() {
   const { dayProgress } = useHabits();
@@ -206,7 +206,7 @@ function AnalysisView({ analysis }: { analysis: Analysis }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   applyButton: {
     alignSelf: 'flex-start',
     backgroundColor: colors.accentDark,
@@ -333,4 +333,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
-});
+}));

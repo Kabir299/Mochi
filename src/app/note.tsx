@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,7 +8,7 @@ import { fromDateKey } from '@/lib/dates';
 import { MOODS } from '@/lib/moods';
 import { closeModal } from '@/lib/nav';
 import { useHabits } from '@/state/habits';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 export default function NoteScreen() {
   const { id, day } = useLocalSearchParams<{ id: string; day: string }>();
@@ -94,7 +94,7 @@ function NoteForm({ habitId, day }: { habitId: number; day: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -166,4 +166,4 @@ const styles = StyleSheet.create({
     color: colors.iconMuted,
     fontSize: 12,
   },
-});
+}));

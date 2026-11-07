@@ -5,7 +5,7 @@ import { colors } from '@/theme';
 
 const PIECES = 36;
 const DURATION = 2400;
-const PALETTE = [colors.accent, colors.streak, colors.water, colors.accentLight, '#F4A0B5'];
+const palette = () => [colors.accent, colors.streak, colors.water, colors.accentLight, '#F4A0B5'];
 
 type Piece = { x: number; delay: number; spin: number; color: string; size: number };
 
@@ -14,7 +14,7 @@ function makePieces(width: number): Piece[] {
     x: Math.random() * width,
     delay: Math.random() * 400,
     spin: (Math.random() - 0.5) * 6,
-    color: PALETTE[i % PALETTE.length],
+    color: palette()[i % 5],
     size: 6 + Math.random() * 6,
   }));
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { ComponentRef, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -6,9 +6,9 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BodyGoalCard } from '@/components/BodyGoalCard';
-import { Guide, GuideStep } from '@/components/Guide';
 import { ProgressChart } from '@/components/ProgressChart';
 import { ProLock } from '@/components/ProLock';
+import { Spotlight } from '@/components/Spotlight';
 import { TrackPicker } from '@/components/TrackPicker';
 import { formatDuration, lastNDays, toDateKey } from '@/lib/dates';
 import { useToday } from '@/lib/useToday';
@@ -16,7 +16,7 @@ import type { Meal } from '@/lib/db';
 import { useHabits } from '@/state/habits';
 import { useNutrition } from '@/state/nutrition';
 import { useSettings } from '@/state/settings';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 const WATER_AMOUNTS = [250, 500, 750];
 const GYM_MINUTES = [30, 45, 60, 90];
@@ -28,27 +28,6 @@ const MEALS: [Meal, string][] = [
 ];
 
 const fmt = (n: number) => n.toLocaleString();
-
-const WATER_STEP: GuideStep = {
-  icon: 'water-outline',
-  title: 'Track your water',
-  body: 'Tap +250, +500 or +750 ml as you drink. The arrow undoes the last one.',
-};
-const GYM_STEP: GuideStep = {
-  icon: 'barbell-outline',
-  title: 'Log your gym sessions',
-  body: 'Tap how long you trained. If you have a Gym habit, I’ll tick it off too.',
-};
-const FOOD_STEP: GuideStep = {
-  icon: 'restaurant-outline',
-  title: 'Log your food',
-  body: 'Tap Add food and type what you ate. AI can estimate the calories and protein for you.',
-};
-const GOAL_STEP: GuideStep = {
-  icon: 'body-outline',
-  title: 'Set a body goal',
-  body: 'Optional. Tell me your goal and I’ll suggest your daily targets.',
-};
 
 export default function NutritionScreen() {
   const settings = useSettings();
@@ -96,33 +75,55 @@ export default function NutritionScreen() {
   const { trackAsked, trackFood, trackWater, trackGym, isPro } = settings;
   const picking = !trackAsked || choosing;
   const foodOn = trackFood && isPro;
-  const guideSteps: GuideStep[] = [
-    ...(trackWater ? [WATER_STEP] : []),
-    ...(trackGym ? [GYM_STEP] : []),
-    ...(foodOn ? [FOOD_STEP] : []),
-    ...(trackWater || foodOn ? [GOAL_STEP] : []),
-  ];
+  const waterRef = useRef<ComponentRef<typeof View>>(null);
+  const gymRef = useRef<ComponentRef<typeof View>>(null);
+  const foodRef = useRef<ComponentRef<typeof View>>(null);
+  const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
+  const scrollY = useRef(0);
+  const guideOn = !picking && !settings.nutritionGuideSeen && (trackWater || trackGym || foodOn);
+  const finishGuide = () => settings.update({ nutritionGuideSeen: true });
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Tabs mount on first open, so nothing here shows until this tab is first tapped. */}
-      {!picking && !settings.nutritionGuideSeen && guideSteps.length > 0 && (
-        <Guide steps={guideSteps} onDone={() => settings.update({ nutritionGuideSeen: true })} />
+      {guideOn && (
+        <Spotlight
+          stepKey="health"
+          target={trackWater ? waterRef : trackGym ? gymRef : foodRef}
+          title="Log it in one tap"
+          body="Tap an amount as you go. Change what shows here at the bottom of this tab."
+          nextLabel="Got it"
+          onNext={finishGuide}
+          scrollBy={(dy) =>
+            scroller.current?.scrollTo({ y: scrollY.current + dy, animated: false })
+          }
+        />
       )}
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        ref={scroller}
+        contentContainerStyle={styles.content}
+        scrollEventThrottle={32}
+        onScroll={(e) => {
+          scrollY.current = e.nativeEvent.contentOffset.y;
+        }}
+      >
         <Text style={styles.title}>Health</Text>
         {picking ? (
           <TrackPicker onDone={() => setChoosing(false)} />
         ) : (
           <>
-            {(trackWater || foodOn) && <BodyGoalCard />}
+            {(trackWater || foodOn) && (
+              <View collapsable={false}>
+                <BodyGoalCard />
+              </View>
+            )}
 
             {!trackWater && !trackFood && !trackGym && (
               <Text style={styles.sub}>You’re not tracking anything here right now.</Text>
             )}
 
             {trackWater && (
-              <View style={styles.card}>
+              <View ref={waterRef} collapsable={false} style={styles.card}>
                 <View style={styles.cardHeader}>
                   <Ionicons name="water-outline" size={20} color={colors.water} />
                   <Text style={styles.cardTitle}>Water</Text>
@@ -176,7 +177,7 @@ export default function NutritionScreen() {
             )}
 
             {trackGym && (
-              <View style={styles.card}>
+              <View ref={gymRef} collapsable={false} style={styles.card}>
                 <View style={styles.cardHeader}>
                   <Ionicons name="barbell-outline" size={20} color={colors.accent} />
                   <Text style={styles.cardTitle}>Gym</Text>
@@ -227,7 +228,7 @@ export default function NutritionScreen() {
             )}
 
             {foodOn && (
-              <View style={styles.card}>
+              <View ref={foodRef} collapsable={false} style={styles.card}>
                 <View style={styles.cardHeader}>
                   <Ionicons name="restaurant-outline" size={20} color={colors.streak} />
                   <Text style={styles.cardTitle}>Food</Text>
@@ -404,7 +405,7 @@ function GoalStepper({ label, value, unit, step, min, onChange }: StepperProps) 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -588,4 +589,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

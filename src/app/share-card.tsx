@@ -1,5 +1,5 @@
 import { ComponentRef, useRef, useState } from 'react';
-import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, Share, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import { useLocalSearchParams } from 'expo-router';
@@ -12,7 +12,7 @@ import { lastNDays, toDateKey } from '@/lib/dates';
 import { useToday } from '@/lib/useToday';
 import { useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 const WEEKDAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -91,7 +91,7 @@ export default function ShareCardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -183,4 +183,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-});
+}));

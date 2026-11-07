@@ -1,11 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -23,7 +22,10 @@ import { describeItem, estimateMeal } from '@/lib/estimateMeal';
 import type { Meal } from '@/lib/db';
 import { useNutrition } from '@/state/nutrition';
 import { useSettings } from '@/state/settings';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
+
+// How long typing must pause before asking the AI about foods not on the list.
+const AI_PAUSE_MS = 1200;
 
 const MEAL_OPTIONS = [
   ['breakfast', 'Breakfast'],
@@ -60,7 +62,6 @@ export default function FoodFormScreen() {
   const [manual, setManual] = useState(false);
   const [ai, setAi] = useState<{ text: string; result: FoodEstimate } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
 
   const local = useMemo(() => estimateMeal(name), [name]);
   // An AI estimate only applies to the exact text it was made for.
@@ -88,20 +89,31 @@ export default function FoodFormScreen() {
     setError(null);
   };
 
-  const askAi = async () => {
-    const text = name.trim();
-    if (!text) return;
-    setAiLoading(true);
-    setAiError(null);
-    try {
-      setAi({ text, result: await requestFoodEstimate(text) });
-      setManual(false);
-    } catch (e) {
-      setAiError(e instanceof Error ? e.message : 'Couldn’t get an AI estimate.');
-    } finally {
+  // Anything not on the food list goes to the AI by itself once typing pauses. If that
+  // fails (offline, say), the rough guess from the list stays in place.
+  const text = name.trim();
+  const needsAi = isPro && local.unmatched.length > 0 && !aiResult;
+  const [aiFailedFor, setAiFailedFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!needsAi || aiFailedFor === text) return;
+    let stale = false;
+    const timer = setTimeout(async () => {
+      setAiLoading(true);
+      try {
+        const result = await requestFoodEstimate(text);
+        if (!stale) setAi({ text, result });
+      } catch {
+        if (!stale) setAiFailedFor(text);
+      } finally {
+        if (!stale) setAiLoading(false);
+      }
+    }, AI_PAUSE_MS);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
       setAiLoading(false);
-    }
-  };
+    };
+  }, [needsAi, text, aiFailedFor]);
 
   const save = async () => {
     const trimmed = name.trim();
@@ -141,7 +153,7 @@ export default function FoodFormScreen() {
             </Pressable>
           }
         />
-        <PrivacyNote text="Food is saved on this phone. The AI estimate sends only the meal text, deleted right after." />
+        <PrivacyNote text="Food is saved on this phone. Foods not on the built-in list are sent to the AI as text only, deleted right after." />
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.field}>
             <Text style={styles.label}>What did you eat?</Text>
@@ -155,10 +167,10 @@ export default function FoodFormScreen() {
               placeholderTextColor={colors.iconMuted}
               style={styles.input}
               autoFocus
-              maxLength={120}
+              maxLength={200}
             />
             <Text style={styles.hint}>
-              List what you had, with amounts if you know them: “200g paneer”, “2 eggs”.
+              List what you had, commas optional: “cheese naan with gravy 100g”, “2 eggs toast”.
             </Text>
           </View>
 
@@ -169,12 +181,12 @@ export default function FoodFormScreen() {
                 <Text style={styles.estimateTitle}>
                   {estimate
                     ? `About ${estimate.kcal} kcal · ${estimate.protein} g protein`
-                    : 'No match in the food list yet'}
+                    : 'Type a food to estimate it'}
                 </Text>
               </View>
               {aiResult
-                ? aiResult.items.map((item) => (
-                    <Text key={item.name} style={styles.estimateLine}>
+                ? aiResult.items.map((item, i) => (
+                    <Text key={i} style={styles.estimateLine}>
                       {item.portion} {item.name} · {Math.round(item.calories)} kcal ·{' '}
                       {Math.round(item.protein_g)} g
                     </Text>
@@ -185,25 +197,24 @@ export default function FoodFormScreen() {
                       {Math.round(item.protein)} g
                     </Text>
                   ))}
-              {!aiResult && local.unmatched.length > 0 && (
-                <Text style={styles.unmatched}>Not recognised: {local.unmatched.join(', ')}</Text>
+              {!aiResult && local.unmatched.length > 0 && !aiLoading && (
+                <Text style={styles.unmatched}>
+                  Not on my list, so this is a rough guess: {local.unmatched.join(', ')}. Change
+                  the numbers if you know better.
+                </Text>
+              )}
+              {aiResult && <Text style={styles.estimateNote}>Estimated by AI</Text>}
+              {aiLoading && (
+                <View style={styles.aiButton}>
+                  <ActivityIndicator size="small" color={colors.accent} />
+                  <Text style={styles.estimateNote}>Estimating what’s not on my list…</Text>
+                </View>
               )}
               {manual && estimate && (
                 <Pressable onPress={() => setManual(false)} hitSlop={8}>
                   <Text style={styles.link}>Use the estimate again</Text>
                 </Pressable>
               )}
-              {isPro && !aiResult && (local.unmatched.length > 0 || !estimate) && (
-                <Pressable onPress={askAi} disabled={aiLoading} style={styles.aiButton}>
-                  {aiLoading ? (
-                    <ActivityIndicator size="small" color={colors.accent} />
-                  ) : (
-                    <Ionicons name="sparkles-outline" size={15} color={colors.accent} />
-                  )}
-                  <Text style={styles.link}>Estimate with AI</Text>
-                </Pressable>
-              )}
-              {aiError && <Text style={styles.error}>{aiError}</Text>}
             </View>
           )}
 
@@ -246,7 +257,7 @@ export default function FoodFormScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   hint: {
     color: colors.iconMuted,
     fontSize: 12,
@@ -276,6 +287,10 @@ const styles = StyleSheet.create({
   unmatched: {
     color: colors.streak,
     fontSize: 13,
+  },
+  estimateNote: {
+    color: colors.textMuted,
+    fontSize: 12,
   },
   link: {
     color: colors.accent,
@@ -327,4 +342,4 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: 13,
   },
-});
+}));

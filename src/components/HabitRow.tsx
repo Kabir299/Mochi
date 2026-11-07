@@ -1,9 +1,10 @@
-import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { ComponentRef, Ref } from 'react';
+import { Pressable, StyleProp, Text, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { Habit } from '@/state/habits';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 type Props = {
   habit: Habit;
@@ -24,6 +25,8 @@ type Props = {
   // because the timeline's coloured capsule already shows the icon.
   variant?: 'card' | 'timeline';
   style?: StyleProp<ViewStyle>;
+  // Lets the walkthrough find this row on screen.
+  rootRef?: Ref<ComponentRef<typeof View>>;
 };
 
 export function HabitRow({
@@ -39,6 +42,7 @@ export function HabitRow({
   subtitle,
   variant = 'card',
   style,
+  rootRef,
 }: Props) {
   const plain = variant === 'timeline';
   const done = count >= habit.target;
@@ -63,6 +67,8 @@ export function HabitRow({
 
   return (
     <Pressable
+      ref={rootRef}
+      collapsable={false}
       onPress={handlePress}
       onLongPress={onMenu}
       style={({ pressed }) => [
@@ -206,7 +212,7 @@ export function HabitRow({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -338,4 +344,4 @@ const styles = StyleSheet.create({
   streakZero: {
     color: colors.textMuted,
   },
-});
+}));

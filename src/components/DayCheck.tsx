@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { addDays, toDateKey } from '@/lib/dates';
 import { parseDays, withRestDays, yesterdayStatus } from '@/lib/streak';
 import { IconName, useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 // Kind words about yesterday on Today: a freeze that saved the streak, an offer to
 // repair a broken one by finishing today at 100%, its progress, and the result.
@@ -146,7 +146,7 @@ function Card({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.card,
@@ -182,4 +182,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   primaryText: { color: colors.onAccent, fontSize: 14, fontWeight: '600' },
-});
+}));

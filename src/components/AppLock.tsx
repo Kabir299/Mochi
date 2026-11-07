@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pet } from '@/components/Pet';
 import { lockSupported, lockUnavailableReason, unlock } from '@/lib/lock';
 import { useSettings } from '@/state/settings';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 // Covers the app while it's in the app switcher, and when App lock is on, asks for
 // fingerprint / Face ID / PIN on launch and after the app has been in the background.
@@ -90,7 +90,7 @@ export function AppLock() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   cover: {
     ...StyleSheet.absoluteFill,
     backgroundColor: colors.background,
@@ -110,4 +110,4 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   buttonText: { color: colors.onAccent, fontSize: 16, fontWeight: '600' },
-});
+}));

@@ -6,7 +6,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
@@ -29,7 +28,7 @@ import {
 } from '@/lib/purchases';
 import { IconName } from '@/state/habits';
 import { useSettings } from '@/state/settings';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 const FEATURES: { icon: IconName; title: string; body: string }[] = [
   {
@@ -238,7 +237,7 @@ export default function ProScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -361,4 +360,4 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     textAlign: 'center',
   },
-});
+}));

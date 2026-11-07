@@ -1,3 +1,9 @@
+import { ASIAN } from '@/lib/foodData/asian';
+import { BASICS } from '@/lib/foodData/basics';
+import { SOUTH_ASIAN } from '@/lib/foodData/southAsian';
+import type { FoodRow } from '@/lib/foodData/types';
+import { WORLD } from '@/lib/foodData/world';
+
 // Typical values for one common portion. Estimates for everyday logging,
 // not exact nutrition labels.
 export type Food = {
@@ -11,7 +17,7 @@ export type Food = {
   protein: number;
 };
 
-export const FOODS: Food[] = [
+const EVERYDAY: Food[] = [
   // Indian breads and rice
   {
     name: 'roti',
@@ -587,4 +593,15 @@ export const FOODS: Food[] = [
     kcal: 140,
     protein: 2,
   },
+];
+
+function fromRow([names, portion, grams, kcal, protein]: FoodRow): Food {
+  const [name, ...aliases] = names.split('|');
+  return { name, aliases, portion, grams, kcal, protein };
+}
+
+// When two entries share a name, the earlier one wins.
+export const FOODS: Food[] = [
+  ...[...SOUTH_ASIAN, ...ASIAN, ...WORLD, ...BASICS].map(fromRow),
+  ...EVERYDAY,
 ];

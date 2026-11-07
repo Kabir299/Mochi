@@ -3,13 +3,16 @@ import { requireOptionalNativeModule } from 'expo';
 import type * as NotificationsModule from 'expo-notifications';
 
 import { confirmAction } from '@/lib/confirm';
-import { formatMinute, fromDateKey, toDateKey } from '@/lib/dates';
+import { DateKey, formatMinute } from '@/lib/dates';
+import { upcomingReminders } from '@/lib/reminderPlan';
 import type { Habit } from '@/state/habits';
 
 const CHANNEL = 'reminders';
 const NUDGE_MINUTE = 20 * 60;
 // iOS keeps at most 64 scheduled notifications per app.
 const MAX_SCHEDULED = 60;
+// Survives the reschedule below, so ticking a task doesn't silence a running focus timer.
+const FOCUS_END_ID = 'focus-end';
 
 // Expo Go on Android ships without some of expo-notifications' native parts and
 // crashes on import, so check for them before loading anything.
@@ -38,6 +41,8 @@ async function notifications() {
 
 type SyncInput = {
   habits: Habit[];
+  isScheduled: (habit: Habit, day: DateKey) => boolean;
+  isDone: (habit: Habit, day: DateKey) => boolean;
   remindersOn: boolean;
   streakNudge: boolean;
   // Whether today's progress has already reached the streak threshold.
@@ -107,6 +112,7 @@ export async function scheduleFocusEnd(seconds: number, title: string, body: str
   if (!(await Notifications.getPermissionsAsync()).granted) return null;
   await ensureChannel(Notifications);
   return Notifications.scheduleNotificationAsync({
+    identifier: FOCUS_END_ID,
     content: { title, body },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -129,75 +135,60 @@ function minutesText(min: number) {
   return [h ? `${h} h` : '', m ? `${m} min` : ''].filter(Boolean).join(' ');
 }
 
-// Replaces every scheduled notification with the current plan. Cheap enough to
-// call whenever habits or settings change.
+let syncing = false;
+let queued: SyncInput | null = null;
+
+// Replaces every scheduled reminder with the current plan. Cheap enough to call whenever
+// habits or settings change. Ticks can come quickly, so runs go one at a time and only
+// the newest waiting plan is applied; overlapping runs would double up reminders.
 export async function syncReminders(input: SyncInput) {
   if (!remindersSupported) return;
+  queued = input;
+  if (syncing) return;
+  syncing = true;
+  try {
+    while (queued) {
+      const next = queued;
+      queued = null;
+      await applyReminders(next);
+    }
+  } finally {
+    syncing = false;
+  }
+}
+
+async function applyReminders(input: SyncInput) {
   const Notifications = await notifications();
-  await Notifications.cancelAllScheduledNotificationsAsync();
+  for (const scheduled of await Notifications.getAllScheduledNotificationsAsync()) {
+    if (scheduled.identifier !== FOCUS_END_ID) {
+      await Notifications.cancelScheduledNotificationAsync(scheduled.identifier);
+    }
+  }
   if (!input.remindersOn && !input.streakNudge && !input.weeklyRecap) return;
   await ensureChannel(Notifications);
   if (!(await Notifications.getPermissionsAsync()).granted) return;
 
   const now = new Date();
-  const todayKey = toDateKey(now);
   const requests: NotificationsModule.NotificationRequestInput[] = [];
 
   if (input.remindersOn) {
-    for (const habit of input.habits) {
-      if (habit.startMinute === null) continue;
-      // Early reminders that would fall before midnight just go at the start.
-      const lead = habit.startMinute >= input.reminderLead ? input.reminderLead : 0;
-      const at = habit.startMinute - lead;
-      const hour = Math.floor(at / 60);
-      const minute = at % 60;
+    for (const { habit, date, lead } of upcomingReminders({ ...input, now })) {
       const length = habit.durationMin ? ` · ${minutesText(habit.durationMin)}` : '';
       // The pet does the talking, so reminders feel like a friend, not an alarm.
-      const content = {
-        title: lead > 0 ? `${habit.name} in ${minutesText(lead)}` : habit.name,
-        body:
-          lead > 0
-            ? `${input.petName}: Get ready! Starts at ${formatMinute(habit.startMinute)}${length}.`
-            : `${input.petName}: It’s time! Let’s do this together${length}.`,
-      };
-      if (habit.repeat === 'daily') {
-        requests.push({
-          content,
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.DAILY,
-            hour,
-            minute,
-            channelId: CHANNEL,
-          },
-        });
-      } else if (habit.repeat === 'days') {
-        for (const day of habit.days) {
-          requests.push({
-            content,
-            trigger: {
-              type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-              // Expo counts weekdays from 1 = Sunday.
-              weekday: day + 1,
-              hour,
-              minute,
-              channelId: CHANNEL,
-            },
-          });
-        }
-      } else if (habit.onceDay && habit.onceDay >= todayKey) {
-        const date = fromDateKey(habit.onceDay);
-        date.setHours(hour, minute, 0, 0);
-        if (date > now) {
-          requests.push({
-            content,
-            trigger: {
-              type: Notifications.SchedulableTriggerInputTypes.DATE,
-              date,
-              channelId: CHANNEL,
-            },
-          });
-        }
-      }
+      requests.push({
+        content: {
+          title: lead > 0 ? `${habit.name} in ${minutesText(lead)}` : habit.name,
+          body:
+            lead > 0
+              ? `${input.petName}: Get ready! Starts at ${formatMinute(habit.startMinute!)}${length}.`
+              : `${input.petName}: It’s time! Let’s do this together${length}.`,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date,
+          channelId: CHANNEL,
+        },
+      });
     }
   }
 

@@ -1,7 +1,7 @@
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { addDays, DateKey, toDateKey } from '@/lib/dates';
-import { colors } from '@/theme';
+import { colors, themedStyles } from '@/theme';
 
 type Props = {
   today: Date;
@@ -11,16 +11,14 @@ type Props = {
 const WEEKS = 53;
 const CELL = 11;
 const GAP = 3;
-// Sequential single-hue steps from empty to full.
-const STEPS = ['#1F2A27', '#0F4A3B', '#167A5E', '#2FA383', colors.accent];
 
 function step(value: number | null) {
   if (value === null) return null;
-  if (value === 0) return STEPS[0];
-  if (value < 0.4) return STEPS[1];
-  if (value < 0.7) return STEPS[2];
-  if (value < 1) return STEPS[3];
-  return STEPS[4];
+  if (value === 0) return colors.heat[0];
+  if (value < 0.4) return colors.heat[1];
+  if (value < 0.7) return colors.heat[2];
+  if (value < 1) return colors.heat[3];
+  return colors.heat[4];
 }
 
 // GitHub-style year of daily progress, newest week on the right.
@@ -61,7 +59,7 @@ export function YearHeatmap({ today, dayProgress }: Props) {
       </ScrollView>
       <View style={styles.legend}>
         <Text style={styles.legendText}>Less</Text>
-        {STEPS.map((c) => (
+        {colors.heat.map((c) => (
           <View key={c} style={[styles.cell, { backgroundColor: c }]} />
         ))}
         <Text style={styles.legendText}>More</Text>
@@ -70,7 +68,7 @@ export function YearHeatmap({ today, dayProgress }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   grid: {
     flexDirection: 'row',
     gap: GAP,
@@ -95,4 +93,4 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginHorizontal: 2,
   },
-});
+}));

@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,7 +7,7 @@ import { ModalHeader } from '@/components/ModalHeader';
 import { Pet } from '@/components/Pet';
 import { PET_COLORS, PET_ITEMS } from '@/lib/wardrobe';
 import { useSettings } from '@/state/settings';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 // The pet's wardrobe: colours and accessories unlocked by the best day streak.
 export default function PetScreen() {
@@ -115,7 +115,7 @@ export default function PetScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -190,4 +190,4 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 11,
   },
-});
+}));

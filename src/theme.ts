@@ -1,4 +1,11 @@
-export const colors = {
+import { ImageStyle, StyleSheet, TextStyle, ViewStyle } from 'react-native';
+
+type NamedStyles<T> = { [P in keyof T]: ViewStyle | TextStyle | ImageStyle };
+
+export type ThemeMode = 'light' | 'dark';
+export type ThemeChoice = ThemeMode | 'system';
+
+const dark = {
   background: '#0F0F14',
   card: '#1C1C24',
   border: '#2A2A34',
@@ -17,7 +24,62 @@ export const colors = {
   doneBg: '#11231E',
   water: '#85B7EB',
   waterDark: '#0C447C',
+  // Year heatmap, empty to full.
+  heat: ['#1F2A27', '#0F4A3B', '#167A5E', '#2FA383', '#5DCAA5'],
 };
+
+const light: typeof dark = {
+  background: '#F5F5F8',
+  card: '#FFFFFF',
+  border: '#E2E2E8',
+  checkboxBorder: '#BDBDC8',
+  text: '#16161C',
+  textMuted: '#62626E',
+  iconMuted: '#9494A0',
+  accent: '#128A6B',
+  accentDark: '#D3F1E6',
+  accentLight: '#0E6E55',
+  onAccent: '#FFFFFF',
+  streak: '#B96A00',
+  danger: '#C43D3D',
+  dangerBg: '#FBE8E8',
+  proBg: '#FBEFD9',
+  doneBg: '#E4F5EE',
+  water: '#2472C8',
+  waterDark: '#DCEBFA',
+  heat: ['#E8EEEB', '#BDE7D7', '#7FD1B5', '#3CAB88', '#128A6B'],
+};
+
+// The current palette. Read it while rendering, not when a file loads, so it can change.
+export const colors = { ...dark };
+
+let current: ThemeMode = 'dark';
+let version = 0;
+
+// The root layout calls this, then remounts the screens so they all pick up the new colours.
+export function applyTheme(mode: ThemeMode) {
+  if (mode === current) return;
+  current = mode;
+  version++;
+  Object.assign(colors, mode === 'light' ? light : dark);
+}
+
+// Like StyleSheet.create, but rebuilt when the theme changes.
+export function themedStyles<T extends NamedStyles<T> | NamedStyles<any>>(
+  build: () => T & NamedStyles<any>,
+): T {
+  let sheet = {} as T;
+  let builtFor = -1;
+  return new Proxy({} as object, {
+    get(_target, key) {
+      if (builtFor !== version) {
+        sheet = StyleSheet.create(build()) as T;
+        builtFor = version;
+      }
+      return sheet[key as keyof T];
+    },
+  }) as T;
+}
 
 export const radius = {
   card: 12,

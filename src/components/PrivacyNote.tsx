@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing } from '@/theme';
+import { colors, spacing, themedStyles } from '@/theme';
 
 export const PRIVACY_SHORT =
   'Your habits and logs stay on this phone. AI features send a summary only when you use them, and our server deletes it as soon as the answer is back.';
@@ -18,7 +18,7 @@ export function PrivacyNote({ text = AI_NOTE }: { text?: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   row: {
     flexDirection: 'row',
     gap: spacing.xs + 2,
@@ -27,4 +27,4 @@ const styles = StyleSheet.create({
   },
   icon: { marginTop: 2 },
   text: { flex: 1, color: colors.textMuted, fontSize: 12, lineHeight: 17 },
-});
+}));

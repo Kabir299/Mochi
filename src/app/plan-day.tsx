@@ -29,7 +29,7 @@ import { HABIT_ICONS } from '@/lib/icons';
 import { closeModal } from '@/lib/nav';
 import { IconName, useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
-import { colors, radius, spacing } from '@/theme';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 // When to do the flexible tasks. `null` window = any time today.
 const WINDOWS: { id: string; label: string; from: number; to: number }[] = [
@@ -45,11 +45,8 @@ const PRIORITY_LABEL: Record<Priority, string> = {
   medium: 'Medium',
   low: 'Low',
 };
-const PRIORITY_COLOR: Record<Priority, string> = {
-  high: colors.accent,
-  medium: colors.water,
-  low: colors.textMuted,
-};
+const priorityColor = (level: Priority) =>
+  level === 'high' ? colors.accent : level === 'medium' ? colors.water : colors.textMuted;
 const DEFAULT_TASK_MIN = 30;
 // Tasks pulled from the text box aren't saved until the plan is applied, so they get
 // stand-in ids well above any real habit id.
@@ -349,12 +346,12 @@ export default function PlanDayScreen() {
                     {!aiPriorities && (
                       <Pressable
                         onPress={() => cyclePriority(h.id)}
-                        style={[styles.priority, { borderColor: PRIORITY_COLOR[priorityOf(h.id)] }]}
+                        style={[styles.priority, { borderColor: priorityColor(priorityOf(h.id)) }]}
                         accessibilityRole="button"
                         accessibilityLabel={`${h.name} priority ${PRIORITY_LABEL[priorityOf(h.id)]}, tap to change`}
                       >
                         <Text
-                          style={[styles.priorityText, { color: PRIORITY_COLOR[priorityOf(h.id)] }]}
+                          style={[styles.priorityText, { color: priorityColor(priorityOf(h.id)) }]}
                         >
                           {PRIORITY_LABEL[priorityOf(h.id)]}
                         </Text>
@@ -405,7 +402,7 @@ export default function PlanDayScreen() {
                         </Text>
                         <Text style={styles.reason}>
                           {formatDuration(p.duration_min)} ·{' '}
-                          <Text style={{ color: PRIORITY_COLOR[level] }}>
+                          <Text style={{ color: priorityColor(level) }}>
                             {PRIORITY_LABEL[level]}
                           </Text>{' '}
                           · {p.reason}
@@ -497,7 +494,7 @@ function Chip({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -664,4 +661,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
   },
-});
+}));

@@ -22,7 +22,8 @@ import { guessIcon, HABIT_ICONS } from '@/lib/icons';
 import { formatDuration, formatMinute, fromDateKey, toDateKey } from '@/lib/dates';
 import { nextFreeMinute, rememberAddedTask } from '@/lib/nextSlot';
 import { Habit, IconName, Repeat, useHabits } from '@/state/habits';
-import { colors, radius, spacing } from '@/theme';
+import { useSettings } from '@/state/settings';
+import { colors, radius, spacing, themedStyles } from '@/theme';
 
 const MAX_TARGET = 99;
 
@@ -118,7 +119,9 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
         });
   const { addHabit, editHabit, removeHabit, archiveHabit, habitsOn } = useHabits();
 
-  const [name, setName] = useState(existing?.name ?? '');
+  // During the first-run guide the form comes filled in, so it's just a few taps.
+  const { guideSeen } = useSettings();
+  const [name, setName] = useState(existing?.name ?? (guideSeen ? '' : 'Read 10 pages'));
   const [icon, setIcon] = useState<IconName>(existing?.icon ?? HABIT_ICONS[0]);
   const [kind, setKind] = useState<Kind>(existing && existing.target > 1 ? 'count' : 'check');
   const [target, setTarget] = useState(existing && existing.target > 1 ? existing.target : 8);
@@ -654,7 +657,7 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: {
     flex: 1,
     backgroundColor: colors.background,
@@ -935,4 +938,4 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.5,
   },
-});
+}));

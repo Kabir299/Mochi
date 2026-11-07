@@ -1,24 +1,49 @@
-import { ComponentRef, useEffect, useRef, useState } from 'react';
+import { ComponentRef, memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Animated,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
-  ScrollView,
-  StyleSheet,
   Text,
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { formatMinute } from '@/lib/dates';
-import { colors, radius } from '@/theme';
+import { colors, radius, themedStyles } from '@/theme';
 
 const STEP = 15;
 const ROW = 44;
 const RIM = 2; // Rows shown above and below the selected one.
 const DAY_MINUTES = 24 * 60;
 const GRID = Array.from({ length: DAY_MINUTES / STEP }, (_, i) => i * STEP);
-const RIM_OPACITY = [1, 0.6, 0.3];
+// How long the wheel must be still before the form hears about the new time.
+const SETTLE_MS = 120;
+
+// Fading runs on the native side and rows never re-render, so scrolling stays smooth.
+const WheelRow = memo(function WheelRow({
+  index,
+  minute,
+  scrollY,
+  onPick,
+}: {
+  index: number;
+  minute: number;
+  scrollY: Animated.Value;
+  onPick: (index: number) => void;
+}) {
+  const centre = index * ROW;
+  const opacity = scrollY.interpolate({
+    inputRange: [centre - ROW * 3, centre - ROW, centre, centre + ROW, centre + ROW * 3],
+    outputRange: [0.12, 0.6, 1, 0.6, 0.12],
+    extrapolate: 'clamp',
+  });
+  return (
+    <Pressable onPress={() => onPick(index)} style={styles.row}>
+      <Animated.Text style={[styles.time, { opacity }]}>{formatMinute(minute)}</Animated.Text>
+    </Pressable>
+  );
+});
 
 // Scroll to pick a start time; the highlighted row shows when the task would run.
 export function TimeWheel({
@@ -34,31 +59,77 @@ export function TimeWheel({
   const [offGrid, setOffGrid] = useState<number | null>(null);
   if (value % STEP !== 0 && value !== offGrid) setOffGrid(value);
   const times = offGrid === null ? GRID : [...GRID, offGrid].sort((a, b) => a - b);
+
+  // The time under the highlight, which moves ahead of `value` while scrolling.
+  const [centre, setCentre] = useState(value);
+  const [lastValue, setLastValue] = useState(value);
+  if (value !== lastValue) {
+    setLastValue(value);
+    setCentre(value);
+  }
+
   const index = Math.max(0, times.indexOf(value));
-
-  const scroller = useRef<ComponentRef<typeof ScrollView>>(null);
-  // The last time this wheel reported, to tell a scroll from a change made elsewhere.
+  const scroller = useRef<ComponentRef<typeof Animated.ScrollView>>(null);
+  const [scrollY] = useState(() => new Animated.Value(index * ROW));
+  // The time the form last heard about, and the latest one under the highlight.
   const reported = useRef(value);
+  const latest = useRef(value);
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
 
-  const scrollTo = (i: number, animated: boolean) =>
-    scroller.current?.scrollTo({ y: i * ROW, animated });
+  const report = useCallback(() => {
+    if (settle.current) clearTimeout(settle.current);
+    settle.current = null;
+    if (latest.current === reported.current) return;
+    reported.current = latest.current;
+    onChangeRef.current(latest.current);
+  }, []);
 
+  // Leaving the step mid-scroll still keeps the time on show.
+  useEffect(() => report, [report]);
+
+  // A time set from outside the wheel, like the phone's clock.
   useEffect(() => {
     if (value === reported.current) return;
     reported.current = value;
+    latest.current = value;
     scroller.current?.scrollTo({ y: index * ROW, animated: false });
   }, [value, index]);
 
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(event.nativeEvent.contentOffset.y / ROW);
     const minute = times[Math.min(times.length - 1, Math.max(0, i))];
-    if (minute === reported.current) return;
-    reported.current = minute;
+    if (settle.current) clearTimeout(settle.current);
+    settle.current = setTimeout(report, SETTLE_MS);
+    if (minute === latest.current) return;
+    latest.current = minute;
+    setCentre(minute);
     Haptics.selectionAsync();
-    onChange(minute);
   };
 
-  const end = (value + durationMin) % DAY_MINUTES;
+  // Made once: replacing a native scroll event on each render would make scrolling stutter.
+  const onScrollRef = useRef(onScroll);
+  useEffect(() => {
+    onScrollRef.current = onScroll;
+  });
+  // The listener only reads the ref when a scroll happens, never during render.
+  // eslint-disable-next-line react-hooks/refs
+  const [scrollEvent] = useState(() =>
+    Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+      useNativeDriver: true,
+      listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => onScrollRef.current(event),
+    }),
+  );
+
+  const pick = useCallback((i: number) => {
+    scroller.current?.scrollTo({ y: i * ROW, animated: true });
+  }, []);
+
+  const centreIndex = Math.max(0, times.indexOf(centre));
+  const end = (centre + durationMin) % DAY_MINUTES;
 
   return (
     <View
@@ -66,45 +137,39 @@ export function TimeWheel({
       accessible
       accessibilityRole="adjustable"
       accessibilityLabel="Start time"
-      accessibilityValue={{ text: formatMinute(value) }}
+      accessibilityValue={{ text: formatMinute(centre) }}
       accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
       onAccessibilityAction={(event) => {
-        const next = index + (event.nativeEvent.actionName === 'increment' ? 1 : -1);
-        if (next >= 0 && next < times.length) scrollTo(next, true);
+        const next = centreIndex + (event.nativeEvent.actionName === 'increment' ? 1 : -1);
+        if (next >= 0 && next < times.length) pick(next);
       }}
     >
-      <ScrollView
+      <Animated.ScrollView
         ref={scroller}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
+        overScrollMode="never"
         snapToInterval={ROW}
-        decelerationRate="fast"
+        decelerationRate="normal"
         scrollEventThrottle={16}
-        onScroll={onScroll}
-        onLayout={() => scrollTo(index, false)}
+        onScroll={scrollEvent}
+        onLayout={() => scroller.current?.scrollTo({ y: index * ROW, animated: false })}
         contentContainerStyle={styles.rows}
       >
-        {times.map((minute, i) => {
-          const away = Math.abs(i - index);
-          return (
-            <Pressable key={minute} onPress={() => scrollTo(i, true)} style={styles.row}>
-              <Text style={[styles.time, { opacity: RIM_OPACITY[away] ?? 0.15 }]}>
-                {formatMinute(minute)}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+        {times.map((minute, i) => (
+          <WheelRow key={minute} index={i} minute={minute} scrollY={scrollY} onPick={pick} />
+        ))}
+      </Animated.ScrollView>
       <View style={styles.selected}>
         <Text style={styles.selectedText}>
-          {formatMinute(value)} – {formatMinute(end)}
+          {formatMinute(centre)} – {formatMinute(end)}
         </Text>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   wheel: {
     height: ROW * (RIM * 2 + 1),
     overflow: 'hidden',
@@ -138,4 +203,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-});
+}));
