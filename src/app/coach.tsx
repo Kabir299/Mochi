@@ -16,9 +16,24 @@ import { ModalHeader } from '@/components/ModalHeader';
 import { PrivacyNote } from '@/components/PrivacyNote';
 import { ProLock } from '@/components/ProLock';
 import { ChatMessage, requestChat } from '@/lib/ai';
+import { formatDuration, formatMinute } from '@/lib/dates';
+import type { PlanHabit } from '@/lib/profile';
+import { useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
 import { useAiPayload } from '@/state/useAiPayload';
 import { colors, radius, spacing, themedStyles } from '@/theme';
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function describe(habit: PlanHabit) {
+  const when = habit.repeat === 'days' ? habit.days.map((d) => WEEKDAYS[d]).join(' ') : 'Every day';
+  const time =
+    habit.startMinute === null
+      ? 'Any time'
+      : `${formatMinute(habit.startMinute)} · ${formatDuration(habit.durationMin ?? 30)}`;
+  const goal = habit.target > 1 ? ` · ${habit.target} ${habit.unit ?? 'times'}` : '';
+  return `${time} · ${when}${goal}`;
+}
 
 const STARTERS = [
   'Why do I keep missing workouts?',
@@ -29,6 +44,22 @@ const STARTERS = [
 export default function CoachScreen() {
   const { isPro, petName } = useSettings();
   const payload = useAiPayload();
+  const { habits, addHabit } = useHabits();
+  const have = new Set(habits.map((h) => h.name.trim().toLowerCase()));
+  const [adding, setAdding] = useState<string | null>(null);
+
+  const add = async (habit: PlanHabit) => {
+    if (adding) return;
+    setAdding(habit.name);
+    try {
+      const { why: _why, ...input } = habit;
+      await addHabit(input);
+    } catch {
+      setError('Couldn’t add that habit. Try again.');
+    } finally {
+      setAdding(null);
+    }
+  };
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
@@ -44,8 +75,8 @@ export default function CoachScreen() {
     setError(null);
     setLoading(true);
     try {
-      const reply = await requestChat(next, payload());
-      setMessages([...next, { role: 'coach', content: reply }]);
+      const { reply, habits: offered } = await requestChat(next, payload());
+      setMessages([...next, { role: 'coach', content: reply, habits: offered }]);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Try again.');
     } finally {
@@ -85,11 +116,38 @@ export default function CoachScreen() {
               </View>
             )}
             {messages.map((m, i) => (
-              <View
-                key={i}
-                style={[styles.bubble, m.role === 'user' ? styles.mine : styles.theirs]}
-              >
-                <Text style={styles.bubbleText}>{m.content}</Text>
+              <View key={i} style={styles.turn}>
+                <View style={[styles.bubble, m.role === 'user' ? styles.mine : styles.theirs]}>
+                  <Text style={styles.bubbleText}>{m.content}</Text>
+                </View>
+                {m.habits?.map((habit) => {
+                  const added = have.has(habit.name.trim().toLowerCase());
+                  return (
+                    <View key={habit.name} style={styles.offer}>
+                      <View style={styles.offerText}>
+                        <Text style={styles.offerName}>{habit.name}</Text>
+                        <Text style={styles.offerMeta}>{describe(habit)}</Text>
+                        {habit.why !== '' && <Text style={styles.offerMeta}>{habit.why}</Text>}
+                      </View>
+                      <Pressable
+                        onPress={() => add(habit)}
+                        disabled={added || adding !== null}
+                        style={[styles.addButton, added && styles.added]}
+                        accessibilityRole="button"
+                        accessibilityLabel={added ? `${habit.name} added` : `Add ${habit.name}`}
+                      >
+                        <Ionicons
+                          name={added ? 'checkmark' : 'add'}
+                          size={16}
+                          color={added ? colors.accent : colors.onAccent}
+                        />
+                        <Text style={[styles.addText, added && styles.addedText]}>
+                          {added ? 'Added' : 'Add'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
               </View>
             ))}
             {loading && (
@@ -178,6 +236,55 @@ const styles = themedStyles(() => ({
     alignSelf: 'flex-start',
     backgroundColor: colors.card,
     borderBottomLeftRadius: 4,
+  },
+  turn: {
+    gap: spacing.sm,
+  },
+  offer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.accentDark,
+    padding: spacing.md,
+    maxWidth: '85%',
+    alignSelf: 'flex-start',
+  },
+  offerText: {
+    flexShrink: 1,
+    gap: 2,
+  },
+  offerName: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  offerMeta: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.accent,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.xs + 2,
+    paddingHorizontal: spacing.md,
+  },
+  added: {
+    backgroundColor: 'transparent',
+  },
+  addText: {
+    color: colors.onAccent,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addedText: {
+    color: colors.accent,
   },
   bubbleText: {
     color: colors.text,

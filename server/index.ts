@@ -137,8 +137,27 @@ const DayPlan = z.object({
   summary: z.string().describe('One sentence describing the shape of the day.'),
 });
 
+const SuggestedHabit = z.object({
+  name: z.string().describe('Short habit name, 2–6 words, sentence case.'),
+  icon: z.string().describe('One icon name from the allowed list.'),
+  days: z
+    .array(z.number().int())
+    .describe('Weekdays it repeats on, 0 = Sunday … 6 = Saturday. Empty for every day.'),
+  start_time: Time.nullable().describe('null for habits done any time of day.'),
+  duration_min: z.number().int().nullable(),
+  weight: z.number().int().describe('1 small, 2 normal, 3 big or important.'),
+  target: z.number().int().describe('Times per day, 1 for a simple habit.'),
+  unit: z.string().nullable().describe('Unit for counted habits, e.g. "glasses".'),
+  why: z.string().describe('One short sentence on why this habit, at this time.'),
+});
+
 const ChatReply = z.object({
   reply: z.string().describe('The coach reply, a few short paragraphs at most.'),
+  habits: z
+    .array(SuggestedHabit)
+    .describe(
+      'Habits the person can add with one tap. Only when they ask for habits to be added or created, or say yes to ones you suggested; otherwise empty. At most 5.',
+    ),
 });
 
 const BrainDump = z.object({
@@ -172,21 +191,7 @@ const FoodEstimate = z.object({
 
 const OnboardPlan = z.object({
   summary: z.string().describe('Two short sentences on how this plan fits the person.'),
-  habits: z.array(
-    z.object({
-      name: z.string().describe('Short habit name, 2–6 words, sentence case.'),
-      icon: z.string().describe('One icon name from the allowed list.'),
-      days: z
-        .array(z.number().int())
-        .describe('Weekdays it repeats on, 0 = Sunday … 6 = Saturday. Empty for every day.'),
-      start_time: Time.nullable().describe('null for habits done any time of day.'),
-      duration_min: z.number().int().nullable(),
-      weight: z.number().int().describe('1 small, 2 normal, 3 big or important.'),
-      target: z.number().int().describe('Times per day, 1 for a simple habit.'),
-      unit: z.string().nullable().describe('Unit for counted habits, e.g. "glasses".'),
-      why: z.string().describe('One short sentence on why this habit, at this time.'),
-    }),
-  ),
+  habits: z.array(SuggestedHabit),
 });
 
 type Route = {
@@ -233,7 +238,14 @@ task while a lower one is placed. Every flexible task appears in either "plan" o
 
 You are chatting with the user about their habits. Their latest stats are included with
 each message. Answer the question they asked; ask a short follow-up question only when it
-would really help.`,
+would really help.
+
+You can't change anything in the app yourself. When they want habits added, put them in
+"habits": the app shows each one as a card with an Add button, and nothing is added until they
+tap it. Say something like "Tap Add on the ones you want", never that you've added, changed or
+deleted anything. Use icon names from allowed_icons only, and don't suggest a habit they already
+have. For other changes, like editing or deleting a habit or turning on reminders, tell them
+where to do it: tap a habit's ⋮ menu on Today to edit it, and Settings for reminders.`,
     prompt: (body) => JSON.stringify(body),
   },
   '/estimate-food': {

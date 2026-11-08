@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Pet } from '@/components/Pet';
 import { PRIVACY_SHORT, PrivacyNote } from '@/components/PrivacyNote';
-import { requestOnboardPlan, timeToMinute } from '@/lib/ai';
+import { requestOnboardPlan, toPlanHabit } from '@/lib/ai';
 import { formatDuration, formatMinute } from '@/lib/dates';
 import { HABIT_ICONS } from '@/lib/icons';
 import {
@@ -29,14 +29,13 @@ import {
 } from '@/lib/profile';
 import { remindersSupported, requestReminderPermission } from '@/lib/reminders';
 import { STARTER_HABITS } from '@/lib/starter';
-import { IconName, useHabits } from '@/state/habits';
+import { useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
 import { useRestoreBackup } from '@/state/useRestoreBackup';
 import { colors, radius, spacing, themedStyles } from '@/theme';
 
 const WAKE_TIMES = [300, 330, 360, 390, 420, 450, 480, 540, 600];
 const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const FALLBACK_ICON: IconName = 'checkmark-circle-outline';
 const STEPS = 2;
 // Ticked to start with, so setup can be just a couple of taps.
 const STARTER_GOALS: Profile['goals'] = ['workout', 'read', 'water'];
@@ -102,24 +101,7 @@ export default function OnboardingScreen() {
         })),
         allowed_icons: HABIT_ICONS,
       });
-      const mapped: PlanHabit[] = result.habits.map((h) => {
-        const start = timeToMinute(h.start_time);
-        const days = [...new Set(h.days.filter((d) => d >= 0 && d <= 6))].sort();
-        const target = Math.min(99, Math.max(1, Math.round(h.target || 1)));
-        return {
-          name: h.name.slice(0, 40),
-          icon: (HABIT_ICONS as string[]).includes(h.icon) ? (h.icon as IconName) : FALLBACK_ICON,
-          target,
-          unit: target > 1 ? h.unit : null,
-          repeat: days.length > 0 && days.length < 7 ? 'days' : 'daily',
-          days: days.length < 7 ? days : [],
-          weight: Math.min(3, Math.max(1, Math.round(h.weight || 2))),
-          startMinute: start,
-          durationMin: start === null ? null : Math.max(5, h.duration_min ?? 30),
-          onceDay: null,
-          why: h.why,
-        };
-      });
+      const mapped = result.habits.map(toPlanHabit);
       if (mapped.length > 0) showPlan(mapped, result.summary);
     } catch (e) {
       setAiError(e instanceof Error ? e.message : 'Something went wrong. Try again.');

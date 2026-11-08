@@ -4,8 +4,10 @@ import { addDays, DateKey, lastNDays, toDateKey } from '@/lib/dates';
 import type { FoodLog } from '@/lib/db';
 import { purchaseUserId } from '@/lib/purchases';
 import { secureGet, secureSet } from '@/lib/secureStorage';
+import { HABIT_ICONS } from '@/lib/icons';
+import type { PlanHabit } from '@/lib/profile';
 import { habitStats } from '@/lib/stats';
-import type { Habit } from '@/state/habits';
+import type { Habit, IconName } from '@/state/habits';
 
 export type Analysis = {
   summary: string;
@@ -208,11 +210,22 @@ export function requestDayPlan(body: {
   return post<DayPlan>('/plan-day', body);
 }
 
-export type ChatMessage = { role: 'user' | 'coach'; content: string };
+export type ChatMessage = {
+  role: 'user' | 'coach';
+  content: string;
+  // Habits the coach offered, shown as cards to add with a tap.
+  habits?: PlanHabit[];
+};
 
 export async function requestChat(messages: ChatMessage[], stats: ReturnType<typeof buildPayload>) {
-  const { reply } = await post<{ reply: string }>('/chat', { conversation: messages, stats });
-  return reply;
+  const result = await post<{ reply: string; habits?: SuggestedHabit[] }>('/chat', {
+    conversation: messages.map(({ role, content }) => ({ role, content })),
+    stats,
+    allowed_icons: HABIT_ICONS,
+  });
+  // An older server sends no habits.
+  const habits = Array.isArray(result.habits) ? result.habits.slice(0, 5).map(toPlanHabit) : [];
+  return { reply: result.reply, habits };
 }
 
 export type DumpTask = {
@@ -248,7 +261,7 @@ export function requestFoodEstimate(meal: string) {
   return post<FoodEstimate>('/estimate-food', { meal });
 }
 
-export type OnboardHabit = {
+export type SuggestedHabit = {
   name: string;
   icon: string;
   days: number[];
@@ -265,7 +278,29 @@ export function requestOnboardPlan(body: {
   draft: unknown;
   allowed_icons: string[];
 }) {
-  return post<{ summary: string; habits: OnboardHabit[] }>('/onboard-plan', body);
+  return post<{ summary: string; habits: SuggestedHabit[] }>('/onboard-plan', body);
+}
+
+const FALLBACK_ICON: IconName = 'checkmark-circle-outline';
+
+// Turns a habit the AI suggested into one the app can save, keeping every value in range.
+export function toPlanHabit(h: SuggestedHabit): PlanHabit {
+  const start = timeToMinute(h.start_time);
+  const days = [...new Set((h.days ?? []).filter((d) => d >= 0 && d <= 6))].sort();
+  const target = Math.min(99, Math.max(1, Math.round(h.target || 1)));
+  return {
+    name: String(h.name ?? '').slice(0, 40),
+    icon: (HABIT_ICONS as string[]).includes(h.icon) ? (h.icon as IconName) : FALLBACK_ICON,
+    target,
+    unit: target > 1 ? h.unit : null,
+    repeat: days.length > 0 && days.length < 7 ? 'days' : 'daily',
+    days: days.length < 7 ? days : [],
+    weight: Math.min(3, Math.max(1, Math.round(h.weight || 2))),
+    startMinute: start,
+    durationMin: start === null ? null : Math.max(5, h.duration_min ?? 30),
+    onceDay: null,
+    why: h.why ?? '',
+  };
 }
 
 // "HH:MM" <-> minutes after midnight.
