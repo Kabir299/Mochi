@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -13,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { closeModal } from '@/lib/nav';
+import { KeyboardLift } from '@/components/KeyboardLift';
 import { ModalHeader } from '@/components/ModalHeader';
 import { PrivacyNote } from '@/components/PrivacyNote';
 import { Segmented } from '@/components/Segmented';
@@ -140,10 +139,7 @@ export default function FoodFormScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardLift style={styles.flex}>
         <ModalHeader
           title="Add food"
           leftLabel="Cancel"
@@ -252,7 +248,7 @@ export default function FoodFormScreen() {
 
           {error && <Text style={styles.error}>{error}</Text>}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardLift>
     </SafeAreaView>
   );
 }

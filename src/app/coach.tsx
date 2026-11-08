@@ -1,8 +1,6 @@
 import { ComponentRef, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { KeyboardLift } from '@/components/KeyboardLift';
 import { ModalHeader } from '@/components/ModalHeader';
 import { PrivacyNote } from '@/components/PrivacyNote';
 import { ProLock } from '@/components/ProLock';
@@ -67,10 +66,7 @@ export default function CoachScreen() {
           />
         </View>
       ) : (
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
+        <KeyboardLift style={styles.flex}>
           <ScrollView
             ref={scrollRef}
             contentContainerStyle={styles.messages}
@@ -124,7 +120,7 @@ export default function CoachScreen() {
               <Ionicons name="arrow-up" size={20} color={colors.onAccent} />
             </Pressable>
           </View>
-        </KeyboardAvoidingView>
+        </KeyboardLift>
       )}
     </SafeAreaView>
   );

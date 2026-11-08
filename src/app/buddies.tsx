@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -13,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { KeyboardLift } from '@/components/KeyboardLift';
 import { ModalHeader } from '@/components/ModalHeader';
 import { Pet } from '@/components/Pet';
 import { Segmented } from '@/components/Segmented';
@@ -163,10 +162,7 @@ export default function BuddiesScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardLift style={styles.flex}>
         <ModalHeader title="Buddies" leftLabel="Close" />
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.card}>
@@ -398,7 +394,7 @@ export default function BuddiesScreen() {
           </View>
           {message && <Text style={styles.message}>{message}</Text>}
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardLift>
     </SafeAreaView>
   );
 }

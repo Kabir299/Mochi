@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import {
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -15,6 +14,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { closeModal } from '@/lib/nav';
+import { KeyboardLift } from '@/components/KeyboardLift';
 import { Segmented } from '@/components/Segmented';
 import { TimeWheel } from '@/components/TimeWheel';
 import { confirmDestructive } from '@/lib/confirm';
@@ -263,10 +263,7 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardLift style={styles.flex}>
         <View style={styles.topBar}>
           <Pressable onPress={() => closeModal()} hitSlop={12}>
             <Text style={styles.topAction}>Cancel</Text>
@@ -652,7 +649,7 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
           )}
         </ScrollView>
         )}
-      </KeyboardAvoidingView>
+      </KeyboardLift>
     </SafeAreaView>
   );
 }
