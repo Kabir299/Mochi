@@ -2,7 +2,7 @@ import { ImageStyle, StyleSheet, TextStyle, ViewStyle } from 'react-native';
 
 type NamedStyles<T> = { [P in keyof T]: ViewStyle | TextStyle | ImageStyle };
 
-export type ThemeMode = 'light' | 'dark';
+export type ThemeMode = 'light' | 'dark' | 'comic';
 export type ThemeChoice = ThemeMode | 'system';
 
 const dark = {
@@ -50,6 +50,31 @@ const light: typeof dark = {
   heat: ['#E8EEEB', '#BDE7D7', '#7FD1B5', '#3CAB88', '#128A6B'],
 };
 
+// Comic book: hot pink, electric blue and yellow ink on a deep black page.
+const comic: typeof dark = {
+  background: '#0A0A10',
+  card: '#17121F',
+  border: '#2E3A8C',
+  checkboxBorder: '#4A5BD0',
+  text: '#FFF6E5',
+  textMuted: '#A99FBC',
+  iconMuted: '#5E5470',
+  accent: '#FF2E88',
+  accentDark: '#4A0E2C',
+  accentLight: '#FF8CC2',
+  onAccent: '#1A0010',
+  streak: '#FFE14D',
+  danger: '#FF6B5B',
+  dangerBg: '#2E1416',
+  proBg: '#2A2410',
+  doneBg: '#1E0F22',
+  water: '#2FB8FF',
+  waterDark: '#0A3A5C',
+  heat: ['#1E1828', '#4A1636', '#8A1E5A', '#D02676', '#FF2E88'],
+};
+
+const PALETTES: Record<ThemeMode, typeof dark> = { dark, light, comic };
+
 // The current palette. Read it while rendering, not when a file loads, so it can change.
 export const colors = { ...dark };
 
@@ -61,7 +86,9 @@ export function applyTheme(mode: ThemeMode) {
   if (mode === current) return;
   current = mode;
   version++;
-  Object.assign(colors, mode === 'light' ? light : dark);
+  Object.assign(colors, PALETTES[mode]);
+  // Comic panels have sharp corners.
+  radius.card = mode === 'comic' ? 4 : 12;
 }
 
 // Like StyleSheet.create, but rebuilt when the theme changes.

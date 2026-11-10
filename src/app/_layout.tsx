@@ -33,7 +33,7 @@ function ThemedScreens() {
 
   return (
     <Fragment key={mode}>
-      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={mode === 'light' ? 'dark' : 'light'} />
       <Stack
         screenOptions={{
           headerShown: false,

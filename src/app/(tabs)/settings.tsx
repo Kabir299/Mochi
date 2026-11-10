@@ -34,6 +34,7 @@ const THEMES = [
   ['system', 'System'],
   ['light', 'Light'],
   ['dark', 'Dark'],
+  ['comic', 'Comic'],
 ] as const;
 
 const THRESHOLDS = [

@@ -157,7 +157,10 @@ function parse(raw: Record<string, string>): Settings {
     trackFood: raw.trackFood === '1',
     trackWater: raw.trackWater === '1',
     trackGym: raw.trackGym === '1',
-    theme: raw.theme === 'light' || raw.theme === 'dark' ? raw.theme : DEFAULTS.theme,
+    theme:
+      raw.theme === 'light' || raw.theme === 'dark' || raw.theme === 'comic'
+        ? raw.theme
+        : DEFAULTS.theme,
     buddyLinks: raw.buddyLinks ?? '',
     shareName: raw.shareName ?? '',
     syncSecret: raw.syncSecret ?? '',
