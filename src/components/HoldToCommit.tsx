@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 
 import { colors, radius, spacing, themedStyles } from '@/theme';
 
-const HOLD_MS = 4500;
+const HOLD_MS = 3000;
 const SIZE = 168;
 const native = Platform.OS !== 'web';
 
