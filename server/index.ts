@@ -291,13 +291,18 @@ Rules:
     schema: OnboardPlan,
     system: `${COACH}
 
-You design someone's first set of habits from their onboarding answers: the habits they
-want, their wake-up time and their pace. A draft made by simple rules is included; improve
-on it rather than starting over. Keep timed habits from overlapping, all between their
-wake-up time and 23:30. Leave work and study habits (like deep work) without a start time:
-the person picks when and how long in Plan my day. Match the pace: "easy" means about 4
-small habits, "steady" about 6, "all_in" up to 9. Cover the free-text request if there is
-one.`,
+You design someone's first set of habits from their onboarding answers: their main goal
+("main", the one they care about most), other goals, body goal, wake-up and bed times
+(minutes after midnight; a null bedtime means 8 hours before waking), what usually makes them
+quit ("obstacle") and their pace. A draft made by simple rules is included; improve on it
+rather than starting over. The main goal's habit comes first and matters most. Keep timed
+habits from overlapping, all between waking and bedtime. Leave work and study habits (like
+deep work) without a start time: the person picks when and how long in Plan my day. Match the
+pace: "easy" means about 3 small habits, "steady" about 5, "all_in" up to 7. Work around the
+obstacle: "forget" → tie habits to fixed times, "busy" → short habits with no fixed time,
+"bored" → some variety, "too_hard" → fewer and smaller habits whatever the pace, "phone" → a
+phone-free hour in the evening. Mention the obstacle in the summary. Cover the free-text
+request if there is one.`,
     prompt: (body) => `Build my starting plan.\n\n${JSON.stringify(body)}`,
   },
 };

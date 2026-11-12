@@ -18,37 +18,55 @@ export type GoalId =
   | 'journal';
 export type Physique = 'lose_fat' | 'build_muscle' | 'fitter' | 'maintain' | 'none';
 export type Pace = 'easy' | 'steady' | 'all_in';
+export type Obstacle = 'forget' | 'busy' | 'bored' | 'too_hard' | 'phone';
 
 export type Profile = {
+  // The one thing they most want; it leads the plan. Also listed in goals.
+  main: GoalId | null;
   goals: GoalId[];
   other: string;
   physique: Physique;
   weightKg: number | null;
   wakeMinute: number;
+  // Null in older saves, which assumed 8 hours before waking.
+  bedMinute: number | null;
   pace: Pace;
+  // What usually makes them quit, so the plan can work around it.
+  obstacle: Obstacle | null;
 };
 
 export const DEFAULT_PROFILE: Profile = {
+  main: null,
   goals: [],
   other: '',
   physique: 'none',
   weightKg: null,
   wakeMinute: 7 * 60,
+  bedMinute: null,
   pace: 'easy',
+  obstacle: null,
 };
 
 export const GOALS: { id: GoalId; label: string; icon: IconName }[] = [
-  { id: 'workout', label: 'Work out', icon: 'barbell-outline' },
-  { id: 'wake', label: 'Wake up early', icon: 'sunny-outline' },
-  { id: 'sleep', label: 'Sleep better', icon: 'bed-outline' },
-  { id: 'meditate', label: 'Meditate', icon: 'leaf-outline' },
-  { id: 'read', label: 'Read more', icon: 'book-outline' },
-  { id: 'learn', label: 'Learn a skill', icon: 'language-outline' },
-  { id: 'deep', label: 'Deep work', icon: 'code-slash-outline' },
-  { id: 'water', label: 'Drink more water', icon: 'water-outline' },
-  { id: 'eat', label: 'Eat healthier', icon: 'nutrition-outline' },
-  { id: 'screen', label: 'Less screen time', icon: 'phone-portrait-outline' },
-  { id: 'journal', label: 'Journal', icon: 'pencil-outline' },
+  { id: 'workout', label: 'Getting fit', icon: 'barbell-outline' },
+  { id: 'sleep', label: 'Sleeping properly', icon: 'bed-outline' },
+  { id: 'deep', label: 'Actually focusing', icon: 'code-slash-outline' },
+  { id: 'read', label: 'Reading again', icon: 'book-outline' },
+  { id: 'wake', label: 'Waking up earlier', icon: 'sunny-outline' },
+  { id: 'meditate', label: 'Feeling calmer', icon: 'leaf-outline' },
+  { id: 'learn', label: 'Learning a skill', icon: 'language-outline' },
+  { id: 'eat', label: 'Eating better', icon: 'nutrition-outline' },
+  { id: 'water', label: 'Drinking more water', icon: 'water-outline' },
+  { id: 'screen', label: 'Less phone time', icon: 'phone-portrait-outline' },
+  { id: 'journal', label: 'Reflecting on my day', icon: 'pencil-outline' },
+];
+
+export const OBSTACLES: { id: Obstacle; label: string; reply: string }[] = [
+  { id: 'forget', label: 'I forget', reply: 'I’ll remind you before each one.' },
+  { id: 'busy', label: 'Life gets busy', reply: 'Most habits are short and fit any time of day.' },
+  { id: 'bored', label: 'I get bored', reply: 'I’ve added an AI buddy to race against.' },
+  { id: 'too_hard', label: 'I go too hard, too fast', reply: 'We’ll start small and build up.' },
+  { id: 'phone', label: 'My phone', reply: 'I’ve added a phone-free hour every evening.' },
 ];
 
 export const PHYSIQUES: { id: Physique; label: string; hint: string }[] = [
@@ -60,9 +78,8 @@ export const PHYSIQUES: { id: Physique; label: string; hint: string }[] = [
 ];
 
 export const PACES: { id: Pace; label: string; hint: string }[] = [
-  { id: 'easy', label: 'Easy start', hint: 'A few small habits, build up slowly' },
-  { id: 'steady', label: 'Steady', hint: 'A balanced plan you can keep' },
-  { id: 'all_in', label: 'All in', hint: 'More habits, higher bar' },
+  { id: 'easy', label: 'Ease me in', hint: 'About 3 habits. Finish 60% of the day to keep your streak.' },
+  { id: 'all_in', label: 'Let’s go big', hint: 'About 7 habits. Finish 90% of the day to keep your streak.' },
 ];
 
 export function parseProfile(raw: string): Profile | null {
@@ -108,10 +125,14 @@ export function buildLocalPlan(p: Profile, taken: [number, number][] = []): Plan
     return null;
   };
 
+  // Going too hard is what makes them quit, so they start small whatever pace they picked.
+  const pace = p.obstacle === 'too_hard' ? 'easy' : p.pace;
   const size = <T>(easy: T, steady: T, allIn: T) =>
-    p.pace === 'easy' ? easy : p.pace === 'steady' ? steady : allIn;
+    pace === 'easy' ? easy : pace === 'steady' ? steady : allIn;
+  // Busy people get habits that fit any time, apart from waking and sleeping.
+  const flexible = p.obstacle === 'busy';
   const wake = p.wakeMinute;
-  const bedtime = (wake - 8 * 60 + DAY) % DAY;
+  const bedtime = p.bedMinute ?? (wake - 8 * 60 + DAY) % DAY;
   // Evening habits end by bedtime, or by 11:30 PM when bedtime is after midnight.
   const lateBed = bedtime < 12 * 60;
   const eveningEnd = lateBed ? 23 * 60 + 30 : bedtime;
@@ -127,17 +148,20 @@ export function buildLocalPlan(p: Profile, taken: [number, number][] = []): Plan
     weight: 1 | 2 | 3,
     why: string,
     days: number[] = [],
-  ): PlanHabit => ({
-    ...base,
-    name,
-    icon,
-    weight,
-    why,
-    repeat: days.length > 0 ? 'days' : 'daily',
-    days,
-    durationMin: len,
-    startMinute: place(preferred, len),
-  });
+  ): PlanHabit => {
+    const fixed = !flexible || icon === 'sunny-outline' || icon === 'moon-outline';
+    return {
+      ...base,
+      name: fixed ? name : `${name} ${len} min`,
+      icon,
+      weight,
+      why,
+      repeat: days.length > 0 ? 'days' : 'daily',
+      days,
+      durationMin: fixed ? len : null,
+      startMinute: fixed ? place(preferred, len) : null,
+    };
+  };
   const anyTime = (
     name: string,
     icon: IconName,
@@ -218,9 +242,18 @@ export function buildLocalPlan(p: Profile, taken: [number, number][] = []): Plan
       break;
   }
 
-  const sleepWhy = `8 hours before your ${clock(wake)} wake-up.`;
+  const sleepHours = Math.round((((wake - bedtime + DAY) % DAY) / 60) * 2) / 2;
+  const sleepWhy = `${sleepHours} hours before your ${clock(wake)} wake-up.`;
   const has = (word: string) => rest.some((h) => h.name.toLowerCase().includes(word));
-  for (const goal of p.goals) {
+  // The main goal goes first, so it always makes the cut and leads the day.
+  const goals = p.main ? [p.main, ...p.goals.filter((g) => g !== p.main)] : [...p.goals];
+  if (p.obstacle === 'phone' && !goals.includes('screen')) goals.push('screen');
+  // Few goals but a big pace: top up with easy basics so the plan matches what they asked for.
+  for (const filler of ['water', 'read', 'journal', 'meditate'] as GoalId[]) {
+    if (rest.length + goals.length >= size(3, 5, 7)) break;
+    if (!goals.includes(filler)) goals.push(filler);
+  }
+  for (const goal of goals) {
     switch (goal) {
       case 'workout':
         if (!has('workout')) {
@@ -274,7 +307,11 @@ export function buildLocalPlan(p: Profile, taken: [number, number][] = []): Plan
     }
   }
 
-  const plan = [...anchors, ...rest.slice(0, size(4, 6, 9))];
+  // The main goal's habit leads, even ahead of the body goal's.
+  const mainIcon = GOALS.find((g) => g.id === p.main)?.icon;
+  const lead = mainIcon ? rest.findIndex((h) => h.icon === mainIcon) : -1;
+  if (lead >= 0) rest.unshift({ ...rest.splice(lead, 1)[0], weight: 3 });
+  const plan = [...anchors, ...rest.slice(0, size(3, 5, 7))];
   if (p.other.trim()) {
     plan.push({
       ...anyTime(p.other.trim().slice(0, 40), 'checkmark-circle-outline', 2, 'Something you asked for.'),

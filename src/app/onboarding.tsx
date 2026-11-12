@@ -6,23 +6,28 @@ import {
   ScrollView,
   Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { HoldToCommit } from '@/components/HoldToCommit';
 import { Pet } from '@/components/Pet';
 import { PRIVACY_SHORT, PrivacyNote } from '@/components/PrivacyNote';
 import { requestOnboardPlan, toPlanHabit } from '@/lib/ai';
-import { formatDuration, formatMinute } from '@/lib/dates';
+import { formatDuration, formatMinute, toDateKey } from '@/lib/dates';
 import { HABIT_ICONS } from '@/lib/icons';
+import type { IconName } from '@/state/habits';
 import {
   buildLocalPlan,
   DEFAULT_PROFILE,
   GOALS,
+  OBSTACLES,
   PACES,
   parseProfile,
+  PHYSIQUES,
   PlanHabit,
   Profile,
   suggestedTargets,
@@ -34,23 +39,24 @@ import { useSettings } from '@/state/settings';
 import { useRestoreBackup } from '@/state/useRestoreBackup';
 import { colors, radius, spacing, themedStyles } from '@/theme';
 
-const WAKE_TIMES = [300, 330, 360, 390, 420, 450, 480, 540, 600];
+const WAKE_TIMES = [300, 330, 360, 390, 420, 450, 480, 540, 600, 660];
+const BED_TIMES = [1260, 1320, 1350, 1380, 1410, 0, 30, 60, 120];
 const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const STEPS = 2;
-// Ticked to start with, so setup can be just a couple of taps.
-const STARTER_GOALS: Profile['goals'] = ['workout', 'read', 'water'];
 
-// First launch: a few questions about the person, then a starting plan built
-// around them. Also reachable from Settings → Redo setup. The body goal is asked on
-// the Health tab, and when / how long to work in Plan my day.
+type Step = 'hello' | 'main' | 'extras' | 'body' | 'day' | 'quit' | 'pace' | 'plan' | 'commit';
+
+// First launch: Mochi asks a few questions like a friend would, builds a plan around the
+// answers, and they hold a thumbprint to commit to it. Also reachable from Settings → Redo
+// setup. When and how long to work is asked in Plan my day.
 export default function OnboardingScreen() {
   const { redo } = useLocalSearchParams<{ redo?: string }>();
   const settings = useSettings();
   const { habits, addHabit } = useHabits();
   const [profile, setProfile] = useState<Profile>(
-    () => parseProfile(settings.profile) ?? { ...DEFAULT_PROFILE, goals: STARTER_GOALS },
+    () => parseProfile(settings.profile) ?? DEFAULT_PROFILE,
   );
-  const [step, setStep] = useState(0);
+  const [name, setName] = useState(settings.shareName);
+  const [index, setIndex] = useState(0);
   const [plan, setPlan] = useState<PlanHabit[]>([]);
   const [picked, setPicked] = useState<boolean[]>([]);
   const [summary, setSummary] = useState('');
@@ -61,6 +67,34 @@ export default function OnboardingScreen() {
   const restoreBackup = useRestoreBackup();
 
   const set = (patch: Partial<Profile>) => setProfile((p) => ({ ...p, ...patch }));
+  const first = name.trim().split(' ')[0];
+  const fitness = profile.goals.includes('workout') || profile.goals.includes('eat');
+  const steps: Step[] = [
+    'hello',
+    'main',
+    'extras',
+    ...(fitness ? (['body'] as const) : []),
+    'day',
+    'quit',
+    'pace',
+    'plan',
+    'commit',
+  ];
+  const step = steps[Math.min(index, steps.length - 1)];
+  const back = () => setIndex((i) => Math.max(0, i - 1));
+
+  // The main goal is always one of the goals too.
+  const pickMain = (id: Profile['goals'][number]) =>
+    setProfile((p) => ({
+      ...p,
+      main: id,
+      goals: [id, ...p.goals.filter((g) => g !== id && g !== p.main)],
+    }));
+  const toggleGoal = (id: Profile['goals'][number]) =>
+    setProfile((p) => ({
+      ...p,
+      goals: p.goals.includes(id) ? p.goals.filter((g) => g !== id) : [...p.goals, id],
+    }));
   const leave = () => {
     if (redo && router.canGoBack()) router.back();
     else router.replace('/');
@@ -73,8 +107,8 @@ export default function OnboardingScreen() {
   };
 
   const next = () => {
-    if (step === STEPS - 1) {
-      const local = buildLocalPlan(profile);
+    if (step === 'pace') {
+      const local = buildLocalPlan(fitness ? profile : { ...profile, physique: 'none' });
       showPlan(
         local.length > 0 ? local : STARTER_HABITS.map((h) => ({ ...h, why: '' })),
         local.length > 0
@@ -82,8 +116,10 @@ export default function OnboardingScreen() {
           : 'You didn’t pick any goals, so here’s a simple day to start with.',
       );
       setAiError(null);
+      // Forgetting is the reason they quit, so reminders start on.
+      if (profile.obstacle === 'forget' && remindersSupported) setRemind(true);
     }
-    setStep((s) => s + 1);
+    setIndex((i) => i + 1);
   };
 
   const personalise = async () => {
@@ -123,6 +159,11 @@ export default function OnboardingScreen() {
     await settings.update({
       ...suggestedTargets(profile),
       ...(allowed ? { remindersOn: true, reminderLead: 5 } : {}),
+      ...(name.trim() ? { shareName: name.trim().slice(0, 40) } : {}),
+      // Getting bored is why they quit, so they get someone to race.
+      ...(profile.obstacle === 'bored' && !settings.aiBuddySince
+        ? { aiBuddySince: toDateKey(new Date()) }
+        : {}),
       onboarded: true,
       profile: JSON.stringify(profile),
     });
@@ -141,13 +182,43 @@ export default function OnboardingScreen() {
 
   const count = picked.filter(Boolean).length;
   const targets = suggestedTargets(profile);
+  const mainLabel = GOALS.find((g) => g.id === profile.main)?.label.toLowerCase();
+  const obstacle = OBSTACLES.find((o) => o.id === profile.obstacle);
+
+  const option = (on: boolean, label: string, hint: string | null, onPress: () => void) => (
+    <Pressable
+      key={label}
+      onPress={onPress}
+      style={[styles.option, on && styles.optionOn]}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: on }}
+    >
+      <View style={styles.taskBody}>
+        <Text style={[styles.optionText, on && styles.optionTextOn]}>{label}</Text>
+        {hint && <Text style={styles.taskMeta}>{hint}</Text>}
+      </View>
+      {on && <Ionicons name="checkmark-circle" size={22} color={colors.accent} />}
+    </Pressable>
+  );
+  const chip = (on: boolean, label: string, onPress: () => void, icon?: IconName) => (
+    <Pressable
+      key={label}
+      onPress={onPress}
+      style={[styles.chip, on && styles.chipOn]}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: on }}
+    >
+      {icon && <Ionicons name={icon} size={16} color={on ? colors.onAccent : colors.textMuted} />}
+      <Text style={[styles.chipText, on && styles.chipTextOn]}>{label}</Text>
+    </Pressable>
+  );
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.topBar}>
-        {step > 0 ? (
+        {index > 0 ? (
           <Pressable
-            onPress={() => setStep((s) => s - 1)}
+            onPress={back}
             hitSlop={10}
             accessibilityRole="button"
             accessibilityLabel="Back"
@@ -158,8 +229,8 @@ export default function OnboardingScreen() {
           <View style={styles.topSpacer} />
         )}
         <View style={styles.dots}>
-          {Array.from({ length: STEPS + 1 }, (_, i) => (
-            <View key={i} style={[styles.dot, i <= step && styles.dotOn]} />
+          {steps.map((s, i) => (
+            <View key={s} style={[styles.dot, i <= index && styles.dotOn]} />
           ))}
         </View>
         <Pressable onPress={redo ? leave : skip} hitSlop={10} accessibilityRole="button">
@@ -168,13 +239,23 @@ export default function OnboardingScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {step === 0 && (
+        {step === 'hello' && (
           <View style={styles.welcome}>
             <Pet mood="happy" />
-            <Text style={styles.title}>Hi, I’m {settings.petName}!</Text>
-            <Text style={styles.lead}>
-              Two quick taps and I’ll build your first plan. I’ve picked some answers to start with.
-            </Text>
+            <Text style={styles.title}>Hey! I’m {settings.petName}.</Text>
+            <Text style={styles.lead}>What should I call you?</Text>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Your name"
+              placeholderTextColor={colors.iconMuted}
+              style={styles.input}
+              maxLength={40}
+              autoCapitalize="words"
+              returnKeyType="next"
+              onSubmitEditing={next}
+              accessibilityLabel="Your name"
+            />
             <PrivacyNote text={PRIVACY_SHORT} />
             {!redo && (
               <Pressable onPress={restore} hitSlop={8} accessibilityRole="button">
@@ -184,81 +265,103 @@ export default function OnboardingScreen() {
           </View>
         )}
 
-        {step === 1 && (
+        {step === 'main' && (
           <>
-            <Text style={styles.title}>What do you want to build?</Text>
+            <Text style={styles.title}>
+              {first ? `Nice to meet you, ${first}! ` : ''}What’s one thing you’d love to be better
+              at a month from now?
+            </Text>
             <View style={styles.chips}>
-              {GOALS.map((g) => {
-                const on = profile.goals.includes(g.id);
-                return (
-                  <Pressable
-                    key={g.id}
-                    onPress={() =>
-                      setProfile((p) => ({
-                        ...p,
-                        goals: p.goals.includes(g.id)
-                          ? p.goals.filter((id) => id !== g.id)
-                          : [...p.goals, g.id],
-                      }))
-                    }
-                    style={[styles.chip, on && styles.chipOn]}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: on }}
-                  >
-                    <Ionicons
-                      name={g.icon}
-                      size={16}
-                      color={on ? colors.onAccent : colors.textMuted}
-                    />
-                    <Text style={[styles.chipText, on && styles.chipTextOn]}>{g.label}</Text>
-                  </Pressable>
-                );
-              })}
+              {GOALS.map((g) => chip(profile.main === g.id, g.label, () => pickMain(g.id), g.icon))}
             </View>
-            <Text style={styles.label}>I usually wake up at</Text>
-            <View style={styles.chips}>
-              {WAKE_TIMES.map((m) => {
-                const on = profile.wakeMinute === m;
-                return (
-                  <Pressable
-                    key={m}
-                    onPress={() => set({ wakeMinute: m })}
-                    style={[styles.chip, on && styles.chipOn]}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: on }}
-                  >
-                    <Text style={[styles.chipText, on && styles.chipTextOn]}>
-                      {formatMinute(m)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={styles.label}>Pace</Text>
-            <View style={styles.chips}>
-              {PACES.map((o) => {
-                const on = profile.pace === o.id;
-                return (
-                  <Pressable
-                    key={o.id}
-                    onPress={() => set({ pace: o.id })}
-                    style={[styles.chip, on && styles.chipOn]}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: on }}
-                  >
-                    <Text style={[styles.chipText, on && styles.chipTextOn]}>{o.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={styles.hint}>{PACES.find((o) => o.id === profile.pace)?.hint}</Text>
+            <TextInput
+              value={profile.other}
+              onChangeText={(other) => set({ other })}
+              placeholder="Or type your own"
+              placeholderTextColor={colors.iconMuted}
+              style={styles.input}
+              maxLength={40}
+              accessibilityLabel="Something else you want to get better at"
+            />
           </>
         )}
 
-        {step === 2 && (
+        {step === 'extras' && (
           <>
-            <Text style={styles.title}>Your starting plan</Text>
+            <Text style={styles.title}>Anything else you’d like to work on?</Text>
+            <Text style={styles.lead}>Totally optional. I’ll fit these around your main goal.</Text>
+            <View style={styles.chips}>
+              {GOALS.filter((g) => g.id !== profile.main).map((g) =>
+                chip(profile.goals.includes(g.id), g.label, () => toggleGoal(g.id), g.icon),
+              )}
+            </View>
+          </>
+        )}
+
+        {step === 'body' && (
+          <>
+            <Text style={styles.title}>
+              Are you trying to lose weight, build muscle, or just feel fitter?
+            </Text>
+            {PHYSIQUES.map((o) =>
+              option(
+                profile.physique === o.id,
+                o.id === 'none' ? 'None of these' : o.label,
+                o.id === 'none' ? null : o.hint,
+                () => set({ physique: o.id }),
+              ),
+            )}
+          </>
+        )}
+
+        {step === 'day' && (
+          <>
+            <Text style={styles.title}>What time do you usually get up?</Text>
+            <View style={styles.chips}>
+              {WAKE_TIMES.map((m) =>
+                chip(profile.wakeMinute === m, formatMinute(m), () => set({ wakeMinute: m })),
+              )}
+            </View>
+            <Text style={[styles.title, styles.second]}>And when do you crash?</Text>
+            <View style={styles.chips}>
+              {BED_TIMES.map((m) =>
+                chip(profile.bedMinute === m, formatMinute(m), () => set({ bedMinute: m })),
+              )}
+            </View>
+          </>
+        )}
+
+        {step === 'quit' && (
+          <>
+            <Text style={styles.title}>Be honest: what usually makes you quit a new habit?</Text>
+            <Text style={styles.lead}>I’ll build your plan around it.</Text>
+            {OBSTACLES.map((o) =>
+              option(profile.obstacle === o.id, o.label, null, () => set({ obstacle: o.id })),
+            )}
+          </>
+        )}
+
+        {step === 'pace' && (
+          <>
+            <Text style={styles.title}>Last one: easy start, or are you all in?</Text>
+            {PACES.map((o) =>
+              option(profile.pace === o.id, o.label, o.hint, () => set({ pace: o.id })),
+            )}
+          </>
+        )}
+
+        {step === 'plan' && (
+          <>
+            <Text style={styles.title}>Here’s your plan{first ? `, ${first}` : ''}</Text>
             {summary !== '' && <Text style={styles.lead}>{summary}</Text>}
+            {obstacle && (
+              <View style={styles.tip}>
+                <Ionicons name="bulb-outline" size={18} color={colors.streak} />
+                <Text style={styles.tipText}>
+                  You said “{obstacle.label}”. {obstacle.reply}
+                </Text>
+              </View>
+            )}
             {plan.map((h, i) => (
               <Pressable
                 key={`${h.name}-${i}`}
@@ -338,25 +441,47 @@ export default function OnboardingScreen() {
             )}
           </>
         )}
+        {step === 'commit' && (
+          <View style={styles.welcome}>
+            <Text style={[styles.title, styles.center]}>Make it official{first ? `, ${first}` : ''}</Text>
+            <View style={styles.pledge}>
+              <Text style={styles.pledgeText}>
+                {mainLabel
+                  ? `I’m going to get better at ${mainLabel}. `
+                  : profile.other.trim()
+                    ? `I’m going to work on “${profile.other.trim()}”. `
+                    : ''}
+                I’ll show up for my {count === 1 ? 'habit' : `${count} habits`} every day, even
+                when it’s just a little. Starting today.
+              </Text>
+            </View>
+            <HoldToCommit onDone={finish} />
+            <Text style={styles.hint}>Press and hold the circle like you’re giving a thumbprint.</Text>
+          </View>
+        )}
       </ScrollView>
 
-      <View style={styles.footer}>
-        {step < STEPS ? (
-          <Pressable onPress={next} style={styles.button}>
-            <Text style={styles.buttonText}>{step === 0 ? 'Let’s go' : 'Next'}</Text>
-          </Pressable>
-        ) : (
-          <Pressable
-            onPress={finish}
-            disabled={saving || aiLoading}
-            style={[styles.button, (saving || aiLoading) && styles.disabled]}
-          >
-            <Text style={styles.buttonText}>
-              {count === 0 ? 'Start with no habits' : `Start with ${count} ${count === 1 ? 'habit' : 'habits'}`}
-            </Text>
-          </Pressable>
-        )}
-      </View>
+      {step !== 'commit' && (
+        <View style={styles.footer}>
+          {step === 'plan' ? (
+            <Pressable
+              onPress={() => (count === 0 ? finish() : setIndex((i) => i + 1))}
+              disabled={saving || aiLoading}
+              style={[styles.button, (saving || aiLoading) && styles.disabled]}
+            >
+              <Text style={styles.buttonText}>
+                {count === 0 ? 'Start with no habits' : `Start with ${count} ${count === 1 ? 'habit' : 'habits'}`}
+              </Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={next} style={styles.button}>
+              <Text style={styles.buttonText}>
+                {step === 'hello' ? 'Let’s go' : step === 'extras' && profile.goals.length <= (profile.main ? 1 : 0) ? 'Skip' : 'Next'}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -428,6 +553,67 @@ const styles = themedStyles(() => ({
   hint: {
     color: colors.textMuted,
     fontSize: 12,
+    textAlign: 'center',
+  },
+  second: {
+    marginTop: spacing.lg,
+  },
+  center: {
+    textAlign: 'center',
+  },
+  input: {
+    alignSelf: 'stretch',
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+    color: colors.text,
+    fontSize: 16,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+    padding: spacing.lg,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  optionOn: {
+    borderColor: colors.accent,
+  },
+  optionText: {
+    color: colors.text,
+    fontSize: 16,
+  },
+  optionTextOn: {
+    fontWeight: '600',
+  },
+  tip: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    backgroundColor: colors.proBg,
+    borderRadius: radius.card,
+    padding: spacing.md,
+  },
+  tipText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  pledge: {
+    alignSelf: 'stretch',
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+    padding: spacing.lg,
+  },
+  pledgeText: {
+    color: colors.text,
+    fontSize: 17,
+    lineHeight: 25,
+    textAlign: 'center',
   },
   chips: {
     flexDirection: 'row',
