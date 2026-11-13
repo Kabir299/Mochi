@@ -73,6 +73,37 @@ const SIZES: Record<string, number> = {
 
 const NEGATIONS = new Set(['no', 'without', 'minus', 'skip']);
 
+// The same dish spelled the way people actually type it, so "gobhi prantha" finds
+// "gobi paratha" instead of being read as two foods.
+const SPELLINGS: Record<string, string> = {
+  parantha: 'paratha',
+  prantha: 'paratha',
+  parontha: 'paratha',
+  paronta: 'paratha',
+  parathas: 'paratha',
+  paranthas: 'paratha',
+  gobhi: 'gobi',
+  ghobi: 'gobi',
+  alu: 'aloo',
+  aaloo: 'aloo',
+  aalu: 'aloo',
+  panner: 'paneer',
+  panir: 'paneer',
+  subzi: 'sabzi',
+  subji: 'sabji',
+  rayta: 'raita',
+  khichri: 'khichdi',
+  chhole: 'chole',
+  rajmah: 'rajma',
+  pohe: 'poha',
+  dosai: 'dosa',
+  idly: 'idli',
+};
+
+// Breads that are often stuffed or filled: "egg paratha" is one paratha, not an egg and a
+// paratha.
+const FILLED = new Set(['paratha', 'kulcha', 'naan', 'sandwich', 'roll', 'wrap', 'dosa', 'frankie']);
+
 // Words that join foods or describe an amount, and never count as a food themselves.
 const FILLER = new Set(
   `with and plus or then also along side of the some in on for at to from my i had ate eat have
@@ -140,7 +171,9 @@ function correctTypo(word: string) {
 }
 
 function tokenize(segment: string) {
-  return (segment.match(/\d+\s*\/\s*\d+|\d+(?:\.\d+)?|[\p{L}]+/gu) ?? []).map(correctTypo);
+  return (segment.match(/\d+\s*\/\s*\d+|\d+(?:\.\d+)?|[\p{L}]+/gu) ?? []).map(
+    (word) => SPELLINGS[word] ?? SPELLINGS[correctTypo(word)] ?? correctTypo(word),
+  );
 }
 
 const asNumber = (token: string) => {
@@ -229,7 +262,24 @@ function readEntries(tokens: string[], unmatched: string[]) {
     }
 
     const match = findTerm(tokens, i);
-    if (match) {
+    const after = match && findTerm(tokens, i + match.size);
+    if (match && after && FILLED.has(tokens[i + match.size + after.size - 1])) {
+      // A filling and its bread, like "egg paratha" or "chicken roll": one dish, the bread
+      // plus a share of the filling.
+      endUnknown(true);
+      const filling = match.food;
+      const bread = after.food;
+      addFood(
+        {
+          ...bread,
+          name: `${tokens.slice(i, i + match.size).join(' ')} ${bread.name}`,
+          kcal: Math.round(bread.kcal + filling.kcal * 0.5),
+          protein: Math.round(bread.protein + filling.protein * 0.5),
+        },
+        true,
+      );
+      i += match.size + after.size - 1;
+    } else if (match) {
       endUnknown(true);
       addFood(match.food, false);
       i += match.size - 1;

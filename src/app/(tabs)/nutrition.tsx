@@ -10,7 +10,7 @@ import { ProgressChart } from '@/components/ProgressChart';
 import { ProLock } from '@/components/ProLock';
 import { Spotlight } from '@/components/Spotlight';
 import { TrackPicker } from '@/components/TrackPicker';
-import { formatDuration, lastNDays, toDateKey } from '@/lib/dates';
+import { addDays, formatDuration, lastNDays, toDateKey } from '@/lib/dates';
 import { useToday } from '@/lib/useToday';
 import type { Meal } from '@/lib/db';
 import { useHabits } from '@/state/habits';
@@ -28,6 +28,14 @@ const MEALS: [Meal, string][] = [
 ];
 
 const fmt = (n: number) => n.toLocaleString();
+// How far back you can look: the history the app keeps loaded.
+const MAX_DAYS_BACK = 29;
+
+function dayName(daysBack: number, date: Date) {
+  if (daysBack === 0) return 'Today';
+  if (daysBack === 1) return 'Yesterday';
+  return date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
 
 export default function NutritionScreen() {
   const settings = useSettings();
@@ -37,11 +45,15 @@ export default function NutritionScreen() {
   const [choosing, setChoosing] = useState(false);
 
   const today = useToday();
-  const todayKey = toDateKey(today);
+  // Days back from today being shown; logging adds to that day too.
+  const [daysBack, setDaysBack] = useState(0);
+  const shown = addDays(today, -daysBack);
+  const dayKey = toDateKey(shown);
+  const isToday = daysBack === 0;
 
-  const waterToday = waterFor(todayKey);
-  const lastWaterToday = [...water].reverse().find((w) => w.day === todayKey);
-  const food = foodFor(todayKey);
+  const waterToday = waterFor(dayKey);
+  const lastWaterToday = [...water].reverse().find((w) => w.day === dayKey);
+  const food = foodFor(dayKey);
   const calories = food.reduce((s, f) => s + f.calories, 0);
   const protein = food.reduce((s, f) => s + f.protein, 0);
 
@@ -61,15 +73,14 @@ export default function NutritionScreen() {
   const weekDays = new Set(lastNDays(today, 7).map(toDateKey));
   const gymWeek = gym.filter((g) => weekDays.has(g.day));
   const gymWeekMin = gymWeek.reduce((s, g) => s + g.minutes, 0);
-  const lastGymToday = [...gym].reverse().find((g) => g.day === todayKey);
+  const lastGymToday = [...gym].reverse().find((g) => g.day === dayKey);
+  const gymOnDay = gym.filter((g) => g.day === dayKey);
 
   const logGym = async (minutes: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await addGym(todayKey, minutes);
-    const habit = habitsOn(todayKey).find(
-      (h) => /gym|workout/i.test(h.name) && !isDone(h, todayKey),
-    );
-    if (habit) checkIn(habit, todayKey);
+    await addGym(dayKey, minutes);
+    const habit = habitsOn(dayKey).find((h) => /gym|workout/i.test(h.name) && !isDone(h, dayKey));
+    if (habit) checkIn(habit, dayKey);
   };
 
   const { trackAsked, trackFood, trackWater, trackGym, isPro } = settings;
@@ -108,6 +119,40 @@ export default function NutritionScreen() {
         }}
       >
         <Text style={styles.title}>Health</Text>
+        {!picking && (trackWater || trackGym || foodOn) && (
+          <View style={styles.dayBar}>
+            <Pressable
+              onPress={() => setDaysBack((d) => Math.min(MAX_DAYS_BACK, d + 1))}
+              disabled={daysBack >= MAX_DAYS_BACK}
+              hitSlop={10}
+              style={[styles.dayArrow, daysBack >= MAX_DAYS_BACK && styles.disabled]}
+              accessibilityRole="button"
+              accessibilityLabel="Previous day"
+            >
+              <Ionicons name="chevron-back" size={20} color={colors.text} />
+            </Pressable>
+            <Pressable
+              onPress={() => setDaysBack(0)}
+              disabled={isToday}
+              style={styles.dayLabelWrap}
+              accessibilityRole="button"
+              accessibilityLabel={isToday ? 'Showing today' : 'Back to today'}
+            >
+              <Text style={styles.dayLabel}>{dayName(daysBack, shown)}</Text>
+              {!isToday && <Text style={styles.dayHint}>Tap for today</Text>}
+            </Pressable>
+            <Pressable
+              onPress={() => setDaysBack((d) => Math.max(0, d - 1))}
+              disabled={isToday}
+              hitSlop={10}
+              style={[styles.dayArrow, isToday && styles.disabled]}
+              accessibilityRole="button"
+              accessibilityLabel="Next day"
+            >
+              <Ionicons name="chevron-forward" size={20} color={colors.text} />
+            </Pressable>
+          </View>
+        )}
         {picking ? (
           <TrackPicker onDone={() => setChoosing(false)} />
         ) : (
@@ -139,7 +184,7 @@ export default function NutritionScreen() {
                       key={ml}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        addWater(todayKey, ml);
+                        addWater(dayKey, ml);
                       }}
                       style={({ pressed }) => [styles.quick, pressed && styles.pressed]}
                       accessibilityRole="button"
@@ -192,6 +237,13 @@ export default function NutritionScreen() {
                 {gymWeekMin > 0 && (
                   <Text style={styles.sub}>{formatDuration(gymWeekMin)} in total</Text>
                 )}
+                {!isToday && (
+                  <Text style={styles.sub}>
+                    {gymOnDay.length === 0
+                      ? `${dayName(daysBack, shown)}: no sessions`
+                      : `${dayName(daysBack, shown)}: ${formatDuration(gymOnDay.reduce((s, g) => s + g.minutes, 0))}`}
+                  </Text>
+                )}
                 <View style={styles.quickRow}>
                   {GYM_MINUTES.map((m) => (
                     <Pressable
@@ -233,7 +285,9 @@ export default function NutritionScreen() {
                   <Ionicons name="restaurant-outline" size={20} color={colors.streak} />
                   <Text style={styles.cardTitle}>Food</Text>
                   <Pressable
-                    onPress={() => router.push('/food-form')}
+                    onPress={() =>
+                      router.push(isToday ? '/food-form' : { pathname: '/food-form', params: { day: dayKey } })
+                    }
                     style={({ pressed }) => [styles.addFood, pressed && styles.pressed]}
                     accessibilityRole="button"
                   >
@@ -261,7 +315,11 @@ export default function NutritionScreen() {
                   </View>
                 </View>
 
-                {food.length === 0 && <Text style={styles.sub}>Nothing logged yet today.</Text>}
+                {food.length === 0 && (
+                  <Text style={styles.sub}>
+                    {isToday ? 'Nothing logged yet today.' : `Nothing logged on ${dayName(daysBack, shown)}.`}
+                  </Text>
+                )}
                 {MEALS.map(([meal, label]) => {
                   const items = food.filter((f) => f.meal === meal);
                   if (items.length === 0) return null;
@@ -413,6 +471,31 @@ const styles = themedStyles(() => ({
   content: {
     padding: spacing.lg + 4,
     gap: spacing.lg,
+  },
+  dayBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.card,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  dayArrow: {
+    padding: spacing.sm,
+  },
+  dayLabelWrap: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  dayLabel: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dayHint: {
+    color: colors.accent,
+    fontSize: 11,
   },
   title: {
     color: colors.text,

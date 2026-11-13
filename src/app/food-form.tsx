@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { closeModal } from '@/lib/nav';
@@ -16,7 +17,7 @@ import { ModalHeader } from '@/components/ModalHeader';
 import { PrivacyNote } from '@/components/PrivacyNote';
 import { Segmented } from '@/components/Segmented';
 import { FoodEstimate, requestFoodEstimate } from '@/lib/ai';
-import { toDateKey } from '@/lib/dates';
+import { DateKey, fromDateKey, toDateKey } from '@/lib/dates';
 import { describeItem, estimateMeal } from '@/lib/estimateMeal';
 import type { Meal } from '@/lib/db';
 import { useNutrition } from '@/state/nutrition';
@@ -49,6 +50,21 @@ function parseAmount(text: string) {
 }
 
 export default function FoodFormScreen() {
+  // Opened from a past day on the Health tab, it logs to that day.
+  const params = useLocalSearchParams<{ day?: string }>();
+  const todayKey = toDateKey(new Date());
+  const day: DateKey =
+    params.day && /^\d{4}-\d{2}-\d{2}$/.test(params.day) && params.day <= todayKey
+      ? (params.day as DateKey)
+      : todayKey;
+  const pastDay =
+    day === todayKey
+      ? null
+      : fromDateKey(day).toLocaleDateString(undefined, {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+        });
   const { addFood } = useNutrition();
   const { isPro } = useSettings();
   const [name, setName] = useState('');
@@ -124,7 +140,7 @@ export default function FoodFormScreen() {
     setSaving(true);
     try {
       await addFood({
-        day: toDateKey(new Date()),
+        day,
         meal,
         name: trimmed,
         calories: kcal,
@@ -141,7 +157,7 @@ export default function FoodFormScreen() {
     <SafeAreaView style={styles.safe}>
       <KeyboardLift style={styles.flex}>
         <ModalHeader
-          title="Add food"
+          title={pastDay ? `Add food · ${pastDay}` : 'Add food'}
           leftLabel="Cancel"
           right={
             <Pressable onPress={save} disabled={saving} hitSlop={12}>
