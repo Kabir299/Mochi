@@ -1,4 +1,4 @@
-import { ComponentRef, useEffect, useRef } from 'react';
+import { ComponentRef, useCallback, useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -29,17 +29,29 @@ export function DayPicker({ today, selected, onSelect, isDayComplete, isFrozen }
   );
   const selectedIndex = dates.findIndex((d) => toDateKey(d) === selected);
 
-  // Keep the selected day roughly centred.
-  useEffect(() => {
-    const x = Math.max(0, selectedIndex * (ITEM_WIDTH + ITEM_GAP) - ITEM_WIDTH * 3);
-    scrollRef.current?.scrollTo({ x, animated: true });
-  }, [selectedIndex]);
+  // Keeps the selected day in the middle. The strip's width isn't known until it has been laid
+  // out, and scrolling before then lands on the wrong week, so this also runs after each layout.
+  const width = useRef(0);
+  const centre = useCallback(
+    (animated: boolean) => {
+      if (width.current === 0) return;
+      const x = selectedIndex * (ITEM_WIDTH + ITEM_GAP) - (width.current - ITEM_WIDTH) / 2;
+      scrollRef.current?.scrollTo({ x: Math.max(0, x), animated });
+    },
+    [selectedIndex],
+  );
+  useEffect(() => centre(true), [centre, selected]);
 
   return (
     <ScrollView
       ref={scrollRef}
       horizontal
       showsHorizontalScrollIndicator={false}
+      onLayout={(e) => {
+        width.current = e.nativeEvent.layout.width;
+        centre(false);
+      }}
+      onContentSizeChange={() => centre(false)}
       contentContainerStyle={styles.row}
     >
       {dates.map((date) => {
