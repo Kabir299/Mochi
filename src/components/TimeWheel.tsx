@@ -45,15 +45,15 @@ const WheelRow = memo(function WheelRow({
   );
 });
 
-// Scroll to pick a start time; the highlighted row shows when the task would run.
+// Scroll to pick a time. Used for both when a task starts and when it ends.
 export function TimeWheel({
   value,
-  durationMin,
   onChange,
+  label = 'Start time',
 }: {
   value: number;
-  durationMin: number;
   onChange: (minute: number) => void;
+  label?: string;
 }) {
   // A time off the 15-minute grid (say 9:10) gets its own row so it isn't rounded away.
   const [offGrid, setOffGrid] = useState<number | null>(null);
@@ -129,14 +129,13 @@ export function TimeWheel({
   }, []);
 
   const centreIndex = Math.max(0, times.indexOf(centre));
-  const end = (centre + durationMin) % DAY_MINUTES;
 
   return (
     <View
       style={styles.wheel}
       accessible
       accessibilityRole="adjustable"
-      accessibilityLabel="Start time"
+      accessibilityLabel={label}
       accessibilityValue={{ text: formatMinute(centre) }}
       accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
       onAccessibilityAction={(event) => {
@@ -161,9 +160,7 @@ export function TimeWheel({
         ))}
       </Animated.ScrollView>
       <View style={styles.selected}>
-        <Text style={styles.selectedText}>
-          {formatMinute(centre)} – {formatMinute(end)}
-        </Text>
+        <Text style={styles.selectedText}>{formatMinute(centre)}</Text>
       </View>
     </View>
   );

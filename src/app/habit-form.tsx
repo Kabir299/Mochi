@@ -32,7 +32,6 @@ const TIME_OPTIONS = [
   ['anytime', 'Any time'],
 ] as const;
 type TimeMode = (typeof TIME_OPTIONS)[number][0];
-const DURATIONS = [15, 30, 45, 60, 90, 120];
 const TIME_STEP = 15;
 const DAY_MINUTES = 24 * 60;
 
@@ -77,7 +76,7 @@ const GOAL_OPTIONS = [
 
 type Step = 'what' | 'when' | 'minutes' | 'full';
 const QUICK_STEPS: Step[] = ['what', 'when', 'minutes'];
-const QUICK_MINUTES = [5, 10, 15, 20, 30, 45, 60, 90, 120];
+const QUICK_MINUTES = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240];
 
 // Waits for habits to load so the form's initial state comes from the saved
 // habit, even when opened by a link or after a reload.
@@ -143,6 +142,13 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
       ),
   );
   const [durationMin, setDurationMin] = useState(existing?.durationMin ?? 30);
+  // Picking an end time sets the length, so a task can run as long as it needs, past midnight
+  // too. Moving the start keeps the length.
+  const endMinute = (startMinute + durationMin) % DAY_MINUTES;
+  const setEnd = (minute: number) => {
+    const length = (minute - startMinute + DAY_MINUTES) % DAY_MINUTES;
+    if (length > 0) setDurationMin(length);
+  };
   const [days, setDays] = useState<number[]>(
     existing?.days.length ? existing.days : [1, 2, 3, 4, 5],
   );
@@ -322,7 +328,7 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
                     <Segmented options={TIME_OPTIONS} value={timeMode} onChange={setTimeMode} />
                     {timeMode === 'timed' ? (
                       <>
-                        <TimeWheel value={startMinute} durationMin={durationMin} onChange={setStartMinute} />
+                        <TimeWheel value={startMinute} onChange={setStartMinute} />
                         {Platform.OS !== 'web' && (
                           <Pressable onPress={openTimePicker} hitSlop={8} accessibilityRole="button">
                             <Text style={styles.exactLink}>Pick an exact time</Text>
@@ -380,9 +386,22 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
                 </>
               )}
 
-              {step === 'minutes' && (
+              {step === 'minutes' && timeMode === 'timed' && (
                 <View style={styles.field}>
-                  <Text style={styles.question}>How many minutes?</Text>
+                  <Text style={styles.question}>Until when?</Text>
+                  <TimeWheel value={endMinute} onChange={setEnd} label="End time" />
+                  <Text style={styles.helper}>
+                    {formatMinute(startMinute)} – {formatMinute(endMinute)} ·{' '}
+                    {formatDuration(durationMin)}
+                    {repeat === 'once' ? ` · ${dayLabel}` : repeat === 'daily' ? ' · every day' : ''}
+                  </Text>
+                  {error && <Text style={styles.error}>{error}</Text>}
+                </View>
+              )}
+
+              {step === 'minutes' && timeMode !== 'timed' && (
+                <View style={styles.field}>
+                  <Text style={styles.question}>About how long?</Text>
                   <View style={styles.chips}>
                     {QUICK_MINUTES.map((m) => {
                       const on = m === durationMin && customMinutes === '';
@@ -419,9 +438,7 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
                     maxLength={3}
                   />
                   <Text style={styles.helper}>
-                    {timeMode === 'timed'
-                      ? `${formatMinute(startMinute)} – ${formatMinute((startMinute + durationMin) % DAY_MINUTES)}`
-                      : `About ${formatDuration(durationMin)}, any time`}
+                    {`About ${formatDuration(durationMin)}, any time`}
                     {repeat === 'once' ? ` · ${dayLabel}` : repeat === 'daily' ? ' · every day' : ''}
                   </Text>
                   {error && <Text style={styles.error}>{error}</Text>}
@@ -553,7 +570,7 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
             <Segmented options={TIME_OPTIONS} value={timeMode} onChange={setTimeMode} />
             {timeMode === 'timed' && (
               <>
-                <TimeWheel value={startMinute} durationMin={durationMin} onChange={setStartMinute} />
+                <TimeWheel value={startMinute} onChange={setStartMinute} />
                 {Platform.OS !== 'web' && (
                   <Pressable onPress={openTimePicker} hitSlop={8} accessibilityRole="button">
                     <Text style={styles.exactLink}>Pick an exact time</Text>
@@ -568,25 +585,10 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
                     onChange={(_, date) => date && setStartMinute(dateToMinute(date))}
                   />
                 )}
-                <Text style={styles.timeLabel}>Lasts</Text>
-                <View style={styles.chips}>
-                  {DURATIONS.map((d) => (
-                    <Pressable
-                      key={d}
-                      onPress={() => setDurationMin(d)}
-                      style={[styles.chip, d === durationMin && styles.chipOn]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: d === durationMin }}
-                    >
-                      <Text style={[styles.chipText, d === durationMin && styles.chipTextOn]}>
-                        {formatDuration(d)}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+                <Text style={styles.timeLabel}>Ends</Text>
+                <TimeWheel value={endMinute} onChange={setEnd} label="End time" />
                 <Text style={styles.helper}>
-                  {formatMinute(startMinute)} –{' '}
-                  {formatMinute((startMinute + durationMin) % DAY_MINUTES)}
+                  {formatMinute(startMinute)} – {formatMinute(endMinute)} · {formatDuration(durationMin)}
                 </Text>
               </>
             )}
