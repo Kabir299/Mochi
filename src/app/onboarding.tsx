@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -34,6 +34,7 @@ import {
 } from '@/lib/profile';
 import { remindersSupported, requestReminderPermission } from '@/lib/reminders';
 import { STARTER_HABITS } from '@/lib/starter';
+import { useAccount } from '@/state/account';
 import { useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
 import { useRestoreBackup } from '@/state/useRestoreBackup';
@@ -65,6 +66,8 @@ export default function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
   const [remind, setRemind] = useState(remindersSupported);
   const restoreBackup = useRestoreBackup();
+  const account = useAccount();
+  const [signingIn, setSigningIn] = useState(false);
 
   const set = (patch: Partial<Profile>) => setProfile((p) => ({ ...p, ...patch }));
   const first = name.trim().split(' ')[0];
@@ -174,6 +177,24 @@ export default function OnboardingScreen() {
     if (await restoreBackup()) leave();
   };
 
+  // Signing in on a new device brings the account's habits with it, so setup is skipped.
+  const signIn = async () => {
+    if (signingIn) return;
+    setSigningIn(true);
+    setAiError(null);
+    try {
+      await account.signIn();
+    } catch {
+      setAiError('Couldn’t reach Mochi’s server. Check your connection and try again.');
+    } finally {
+      setSigningIn(false);
+    }
+  };
+  const arrived = !redo && account.account !== null && settings.onboarded;
+  useEffect(() => {
+    if (arrived) router.replace('/');
+  }, [arrived]);
+
   const skip = async () => {
     if (habits.length === 0) for (const habit of STARTER_HABITS) await addHabit(habit);
     await settings.update({ onboarded: true });
@@ -262,6 +283,14 @@ export default function OnboardingScreen() {
                 <Text style={styles.restore}>New phone? Restore a backup</Text>
               </Pressable>
             )}
+            {!redo && account.available && !account.account && (
+              <Pressable onPress={signIn} hitSlop={8} accessibilityRole="button">
+                <Text style={styles.restore}>
+                  {signingIn ? 'Signing in…' : 'Have an account? Sign in with Google'}
+                </Text>
+              </Pressable>
+            )}
+            {aiError && <Text style={styles.error}>{aiError}</Text>}
           </View>
         )}
 

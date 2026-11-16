@@ -11,6 +11,7 @@ import { PurchasesSync } from '@/components/PurchasesSync';
 import { ReminderSync } from '@/components/ReminderSync';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/lib/db';
 import { applyKey, DbChoice, prepareDatabase } from '@/lib/secureDb';
+import { AccountProvider } from '@/state/account';
 import { BuddySyncProvider } from '@/state/buddySync';
 import { HabitsProvider } from '@/state/habits';
 import { NutritionProvider } from '@/state/nutrition';
@@ -54,6 +55,7 @@ function ThemedScreens() {
         <Stack.Screen name="pet" options={{ presentation: 'modal' }} />
         <Stack.Screen name="share-card" options={{ presentation: 'modal' }} />
         <Stack.Screen name="buddies" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="auth" />
       </Stack>
       <AppLock />
     </Fragment>
@@ -91,9 +93,11 @@ export default function RootLayout() {
             <NutritionProvider>
               <ReminderSync />
               <PurchasesSync />
-              <BuddySyncProvider>
-                <ThemedScreens />
-              </BuddySyncProvider>
+              <AccountProvider>
+                <BuddySyncProvider>
+                  <ThemedScreens />
+                </BuddySyncProvider>
+              </AccountProvider>
             </NutritionProvider>
           </HabitsProvider>
         </SettingsProvider>

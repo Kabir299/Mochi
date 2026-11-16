@@ -31,6 +31,15 @@ requests or use them for advertising. The providers process them under their own
 which do not allow training on API data by default. To stop abuse, the server briefly keeps
 a count of requests per IP address in memory; it is not written to disk.
 
+## Account and sync (optional)
+
+You can use Mochi without an account. If you choose to sign in with Google, we receive your name
+and email address from Google, and a copy of your habits, check-ins, notes, water, food and gym logs
+and settings is saved to our database provider (Supabase) so the same data appears on every device
+you sign in to. This copy is protected so only your account can reach it, but unlike buddy updates
+it is not end-to-end encrypted. Signing out stops syncing and leaves the data on your device.
+Settings → Delete account removes your account and the saved copy for good.
+
 ## Buddies
 
 Buddies are something you choose to set up, and nothing is sent until you do. When you link with a
@@ -69,7 +78,7 @@ Reminders are scheduled on your phone. Nothing about them is sent to us.
 
 ## Things the app does not do
 
-- No accounts, ads, analytics or tracking SDKs
+- No ads, analytics or tracking SDKs, and no account unless you choose to sign in
 - No selling or sharing of data with anyone except the AI provider, RevenueCat and Supabase, as above
 - Not intended for children under 13
 

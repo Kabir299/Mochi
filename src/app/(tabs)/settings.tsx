@@ -27,6 +27,7 @@ import { useNutrition } from '@/state/nutrition';
 import { useBuddySync } from '@/state/buddySync';
 import { FREE_LAUNCH, useSettings } from '@/state/settings';
 import { useExactTiming } from '@/state/useExactTiming';
+import { useAccount } from '@/state/account';
 import { useRestoreBackup } from '@/state/useRestoreBackup';
 import { colors, radius, spacing, themedStyles } from '@/theme';
 
@@ -70,6 +71,37 @@ export default function SettingsScreen() {
   const restoreBackup = useRestoreBackup();
   const exactTiming = useExactTiming();
   const anyReminder = settings.remindersOn || settings.streakNudge || settings.weeklyRecap;
+
+  const account = useAccount();
+  const [accountBusy, setAccountBusy] = useState(false);
+  // Runs a sign-in or sign-out step, saying so if the server can't be reached.
+  const withAccount = async (work: () => Promise<unknown>) => {
+    if (accountBusy) return;
+    setAccountBusy(true);
+    try {
+      await work();
+    } catch {
+      Alert.alert('Couldn’t reach Mochi’s server', 'Check your connection and try again.');
+    } finally {
+      setAccountBusy(false);
+    }
+  };
+  const removeAccount = async () => {
+    const ok = await confirmDestructive(
+      'Delete your account?',
+      'Your account and the copy of your data saved with it are deleted for good. What’s on this device stays, and other devices stop syncing.',
+      'Delete account',
+    );
+    if (ok) withAccount(account.deleteAccount);
+  };
+  const syncLine =
+    account.status === 'offline'
+      ? 'Can’t reach the server. Your changes are safe here and will sync later.'
+      : account.status === 'update_needed'
+        ? 'Update Mochi on this device to keep syncing.'
+        : account.status === 'synced'
+          ? 'Everything is synced.'
+          : 'Syncing…';
 
   const backUp = async () => {
     try {
@@ -271,8 +303,8 @@ export default function SettingsScreen() {
         <Section title="Privacy & security">
           <Text style={styles.privacy}>{PRIVACY_SHORT}</Text>
           <Text style={styles.privacy}>
-            No accounts, ads or tracking. Mochi gives general wellness tips, not medical advice;
-            calorie and protein numbers are estimates.
+            No ads or tracking, and an account is optional. Mochi gives general wellness tips, not
+            medical advice; calorie and protein numbers are estimates.
           </Text>
           <Text style={styles.privacy}>
             Buddies you link with get only what you choose, encrypted so we can’t read it.
@@ -317,10 +349,42 @@ export default function SettingsScreen() {
           )}
         </Section>
 
+        {account.available && (
+          <Section title="Account & sync">
+            {account.account ? (
+              <>
+                <Text style={styles.label}>
+                  Signed in as {account.account.email || account.account.name}. {syncLine}
+                </Text>
+                <LinkRow icon="sync-outline" label="Sync now" onPress={account.syncNow} />
+                <LinkRow
+                  icon="log-out-outline"
+                  label="Sign out"
+                  onPress={() => withAccount(account.signOut)}
+                />
+                <LinkRow icon="trash-outline" label="Delete account" onPress={removeAccount} />
+              </>
+            ) : (
+              <>
+                <Text style={styles.label}>
+                  Optional. Sign in to keep the same habits on every phone and on the web. A copy
+                  of your data is then saved to your account.
+                </Text>
+                <LinkRow
+                  icon="logo-google"
+                  label={accountBusy ? 'Signing in…' : 'Continue with Google'}
+                  onPress={() => withAccount(account.signIn)}
+                />
+              </>
+            )}
+          </Section>
+        )}
+
         <Section title="Backup">
           <Text style={styles.label}>
-            Your habits live only on this phone. Save a backup file to Drive, iCloud or a chat with
-            yourself, then restore it on your next phone.
+            {account.account
+              ? 'You can also keep a backup file of your own.'
+              : 'Your habits live only on this phone. Save a backup file to Drive, iCloud or a chat with yourself, then restore it on your next phone.'}
           </Text>
           <LinkRow icon="cloud-upload-outline" label="Save a backup" onPress={backUp} />
           <LinkRow icon="cloud-download-outline" label="Restore from a backup" onPress={restore} />
@@ -409,7 +473,11 @@ function LinkRow({
     | 'diamond-outline'
     | 'cloud-upload-outline'
     | 'cloud-download-outline'
-    | 'shield-checkmark-outline';
+    | 'shield-checkmark-outline'
+    | 'sync-outline'
+    | 'log-out-outline'
+    | 'trash-outline'
+    | 'logo-google';
   label: string;
   onPress: () => void;
 }) {

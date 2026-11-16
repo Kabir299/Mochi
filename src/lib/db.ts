@@ -468,6 +468,31 @@ export function parseBackup(text: string): Backup {
   return backup;
 }
 
+// The same data as a backup, written so two devices holding the same data produce the very same
+// text: no timestamp, nothing that belongs to one device, and rows in a fixed order. Account
+// sync compares and sends this.
+export async function syncSnapshot(db: SQLiteDatabase) {
+  const all = await exportAll(db);
+  const by = (...keys: string[]) => (a: Row, b: Row) => {
+    for (const key of keys) {
+      const x = a[key] ?? '';
+      const y = b[key] ?? '';
+      if (x !== y) return x < y ? -1 : 1;
+    }
+    return 0;
+  };
+  return JSON.stringify({
+    app: all.app,
+    version: all.version,
+    habits: all.habits.sort(by('id')),
+    logs: all.logs.sort(by('habit_id', 'day')),
+    water: all.water.sort(by('id')),
+    food: all.food.sort(by('id')),
+    gym: all.gym.sort(by('id')),
+    settings: all.settings.filter((row) => !DEVICE_SETTINGS.has(String(row.key))).sort(by('key')),
+  });
+}
+
 // Replaces everything on this phone with the backup, all or nothing. Columns the
 // backup doesn't have keep their defaults, so older backups restore too.
 export async function restoreAll(db: SQLiteDatabase, backup: Backup) {

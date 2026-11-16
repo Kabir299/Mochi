@@ -158,3 +158,20 @@ Build this first. Android only; it needs a development build, so Expo Go stops b
 A free project can pause after about a week without activity. If buddies show "Can't reach the
 server", restore it from the Supabase dashboard. Before release, add Supabase to the store's
 data-safety forms and fill in the blanks in PRIVACY.md.
+
+## Google sign-in and sync setup
+
+The code is on the `google-sync` branch. It needs these one-time steps before it works:
+
+1. Supabase → SQL Editor: paste all of `supabase/sync.sql` and press Run.
+2. Google Cloud Console (console.cloud.google.com) → create a project → APIs & Services →
+   OAuth consent screen (External, app name Mochi) → Credentials → Create OAuth client ID →
+   Web application. Under "Authorised redirect URIs" add
+   `https://<your-project-id>.supabase.co/auth/v1/callback`. Copy the Client ID and Client secret.
+3. Supabase → Authentication → Sign In / Providers → Google: turn it on and paste the Client ID
+   and Client secret there (the secret goes only in Supabase, never in the app or this repo).
+4. Supabase → Authentication → URL Configuration → Redirect URLs, add:
+   `mochi://**`, `https://mochi1000-mochi.expo.app/**`, `http://localhost:8082/**` and `exp://**`.
+5. Merge `google-sync` into `main`, build a new APK and redeploy the website.
+
+Before the App Store: Apple requires "Sign in with Apple" in any app that offers Google sign-in.

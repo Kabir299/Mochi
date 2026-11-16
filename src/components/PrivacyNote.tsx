@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, themedStyles } from '@/theme';
 
 export const PRIVACY_SHORT =
-  'Your habits and logs stay on this phone. AI features send a summary only when you use them, and our server deletes it as soon as the answer is back.';
+  'Your habits and logs stay on this phone unless you sign in to sync them. AI features send a summary only when you use them, and our server deletes it as soon as the answer is back.';
 
 const AI_NOTE = 'Sent only to get this answer. Our server deletes it right after.';
 

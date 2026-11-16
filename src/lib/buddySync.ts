@@ -45,7 +45,12 @@ export function syncErrorMessage(e: unknown) {
   }
 }
 
-export async function rpc<T = void>(name: string, args: Record<string, string>): Promise<T> {
+// `token` is a signed-in person's pass, for the account functions in supabase/sync.sql.
+export async function rpc<T = void>(
+  name: string,
+  args: Record<string, string | number | boolean>,
+  token?: string,
+): Promise<T> {
   if (!URL_BASE || !API_KEY) throw new SyncError('offline');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -53,7 +58,11 @@ export async function rpc<T = void>(name: string, args: Record<string, string>):
   try {
     response = await fetch(`${URL_BASE}/rest/v1/rpc/${name}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: API_KEY },
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: API_KEY,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify(args),
       signal: controller.signal,
     });
