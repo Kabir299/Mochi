@@ -21,6 +21,7 @@ import { confirmDestructive } from '@/lib/confirm';
 import * as db from '@/lib/db';
 import { lockSupported, lockUnavailableReason, unlock } from '@/lib/lock';
 import { saveBackup } from '@/lib/backup';
+import { wipeAll } from '@/lib/snapshots';
 import { allowExactTiming, remindersSupported, requestReminderPermission } from '@/lib/reminders';
 import { useHabits } from '@/state/habits';
 import { useNutrition } from '@/state/nutrition';
@@ -147,7 +148,7 @@ export default function SettingsScreen() {
     );
     if (!ok) return;
     await forgetBuddies();
-    await db.deleteAllData(database);
+    await wipeAll(database);
     await Promise.all([reload(), nutrition.reload()]);
     // Back to the setup questions, like a fresh install.
     await settings.update({ petName: 'Mochi', onboarded: false });
@@ -388,6 +389,11 @@ export default function SettingsScreen() {
           </Text>
           <LinkRow icon="cloud-upload-outline" label="Save a backup" onPress={backUp} />
           <LinkRow icon="cloud-download-outline" label="Restore from a backup" onPress={restore} />
+          <LinkRow
+            icon="time-outline"
+            label="Earlier copies"
+            onPress={() => router.push('/copies')}
+          />
         </Section>
 
         <Section title="Archived habits">
@@ -469,6 +475,7 @@ function LinkRow({
   icon:
     | 'compass-outline'
     | 'albums-outline'
+    | 'time-outline'
     | 'help-circle-outline'
     | 'diamond-outline'
     | 'cloud-upload-outline'

@@ -28,7 +28,8 @@ import {
 } from '@/lib/account';
 import { rpc, SyncError } from '@/lib/buddySync';
 import { confirmDestructive } from '@/lib/confirm';
-import { parseBackup, restoreAll, syncSnapshot } from '@/lib/db';
+import { parseBackup, syncSnapshot } from '@/lib/db';
+import { replaceAll } from '@/lib/snapshots';
 import { useHabits } from '@/state/habits';
 import { useNutrition } from '@/state/nutrition';
 import { useSettings } from '@/state/settings';
@@ -60,6 +61,25 @@ type AccountValue = {
 const AccountContext = createContext<AccountValue | null>(null);
 
 const fingerprint = (text: string) => digestStringAsync(CryptoDigestAlgorithm.SHA256, text);
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+// How much a saved copy holds, for choosing between two of them.
+function summarise(data: string) {
+  let habits = 0;
+  let ticks = 0;
+  let records = 0;
+  try {
+    const d = JSON.parse(data) as Record<string, unknown[] | undefined>;
+    habits = d.habits?.length ?? 0;
+    ticks = d.logs?.length ?? 0;
+    records =
+      habits + ticks + (d.water?.length ?? 0) + (d.food?.length ?? 0) + (d.gym?.length ?? 0);
+  } catch {
+    // Unreadable counts as nothing.
+  }
+  return { records, text: `${plural(habits, 'habit')}, ${plural(ticks, 'check-in')}` };
+}
 
 export function AccountProvider({ children }: { children: ReactNode }) {
   const database = useSQLiteContext();
@@ -108,7 +128,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const apply = useCallback(
     async (remote: Pulled, mark: SyncMark) => {
       const backup = parseBackup(remote.data ?? '');
-      await restoreAll(database, backup);
+      await replaceAll(database, backup, 'before_sync');
       const { settings: s, habitsState: h, nutrition: n } = latest.current;
       await Promise.all([h.reload(), n.reload(), s.reload()]);
       // Fingerprinted from what was really stored, so nothing looks changed afterwards.
@@ -154,14 +174,18 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       // Nothing saved to this account yet: this device's data becomes the first copy.
       await push(0);
     } else if (mark.version === 0) {
-      // First sync on this device, and the account already has data.
-      const { habitsState: h, settings: s } = latest.current;
-      const empty = h.habits.length === 0 || !s.onboarded;
+      // First sync on this device, and the account already has data. What's here is read
+      // from the database itself: right after opening the app (Android often restarts it
+      // during Google sign-in) the screens haven't loaded yet and look empty, which once
+      // replaced a phone's whole history without asking.
+      const here = summarise(local);
+      const there = summarise(remote.data ?? '');
+      const counts = `This device: ${here.text}.\nYour account: ${there.text}.`;
       if (
-        empty ||
+        here.records === 0 ||
         (await confirmDestructive(
           'Use your account’s data?',
-          'Your account already has habits saved. Using them replaces what’s on this device.',
+          `${counts}\n\nUsing the account’s data replaces what’s on this device. A copy of this device’s data is kept in Settings → Earlier copies.`,
           'Use account data',
         ))
       ) {
@@ -169,7 +193,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       } else if (
         await confirmDestructive(
           'Keep this device’s data instead?',
-          'It will replace what’s saved in your account, on every device signed in to it.',
+          `${counts}\n\nThis device’s data replaces what’s saved in your account, on every device signed in to it.`,
           'Keep this device’s',
         )
       ) {
