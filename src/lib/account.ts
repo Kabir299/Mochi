@@ -1,6 +1,7 @@
 import { CryptoDigestAlgorithm, CryptoEncoding, digestStringAsync } from 'expo-crypto';
 import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
+import type { SQLiteDatabase } from 'expo-sqlite';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
@@ -175,18 +176,36 @@ export type SyncMark = {
   hash: string;
   // When a change was first noticed here that hasn't been saved to the account yet.
   dirtySince: number | null;
+  // Check-ins in the data at that version, to notice a sync that would lose many of them.
+  ticks?: number;
 };
 
-const MARK_KEY = 'mochi-sync-mark';
+// Kept in the same database as the data it describes. It used to live apart from it, so a
+// device whose data had been reset still thought it was in step, took the empty data for a
+// deliberate change and saved it over the account, emptying every other device too. Now the
+// mark goes wherever the data goes, and a reset device starts again like a new one.
+const MARK_ROW = 'syncMark';
+const LEGACY_MARK_KEY = 'mochi-sync-mark';
 
-export async function loadMark(userId: string): Promise<SyncMark> {
+export async function loadMark(db: SQLiteDatabase, userId: string): Promise<SyncMark> {
+  // The old copy outside the database can't be trusted; it's dropped.
+  remove(LEGACY_MARK_KEY).catch(() => {});
   try {
-    const saved = await secureGet(MARK_KEY);
-    const mark = saved ? (JSON.parse(saved) as SyncMark) : null;
+    const row = await db.getFirstAsync<{ value: string }>(
+      'SELECT value FROM sync_state WHERE key = ?',
+      [MARK_ROW],
+    );
+    const mark = row ? (JSON.parse(row.value) as SyncMark) : null;
     if (mark?.userId === userId) return mark;
   } catch {}
   return { userId, version: 0, hash: '', dirtySince: null };
 }
 
-export const saveMark = (mark: SyncMark) => secureSet(MARK_KEY, JSON.stringify(mark));
-export const clearMark = () => remove(MARK_KEY);
+export const saveMark = (db: SQLiteDatabase, mark: SyncMark) =>
+  db.runAsync('INSERT OR REPLACE INTO sync_state (key, value) VALUES (?, ?)', [
+    MARK_ROW,
+    JSON.stringify(mark),
+  ]);
+
+export const clearMark = (db: SQLiteDatabase) =>
+  db.runAsync('DELETE FROM sync_state WHERE key = ?', [MARK_ROW]);

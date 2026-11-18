@@ -28,7 +28,8 @@ import {
 } from '@/lib/account';
 import { rpc, SyncError } from '@/lib/buddySync';
 import { confirmDestructive } from '@/lib/confirm';
-import { parseBackup, restoreAll, syncSnapshot } from '@/lib/db';
+import { parseBackup, syncSnapshot } from '@/lib/db';
+import { replaceAll } from '@/lib/snapshots';
 import { useHabits } from '@/state/habits';
 import { useNutrition } from '@/state/nutrition';
 import { useSettings } from '@/state/settings';
@@ -60,6 +61,25 @@ type AccountValue = {
 const AccountContext = createContext<AccountValue | null>(null);
 
 const fingerprint = (text: string) => digestStringAsync(CryptoDigestAlgorithm.SHA256, text);
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+// How much a saved copy holds, for choosing between two of them.
+function summarise(data: string) {
+  let habits = 0;
+  let ticks = 0;
+  let records = 0;
+  try {
+    const d = JSON.parse(data) as Record<string, unknown[] | undefined>;
+    habits = d.habits?.length ?? 0;
+    ticks = d.logs?.length ?? 0;
+    records =
+      habits + ticks + (d.water?.length ?? 0) + (d.food?.length ?? 0) + (d.gym?.length ?? 0);
+  } catch {
+    // Unreadable counts as nothing.
+  }
+  return { records, ticks, text: `${plural(habits, 'habit')}, ${plural(ticks, 'check-in')}` };
+}
 
 export function AccountProvider({ children }: { children: ReactNode }) {
   const database = useSQLiteContext();
@@ -100,20 +120,26 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const forget = useCallback(async () => {
-    await Promise.all([clearSession(), clearMark()]);
+    await Promise.all([clearSession(), clearMark(database)]);
     keep(null);
-  }, [keep]);
+  }, [database, keep]);
 
   // Replaces what's on this device with the account's copy.
   const apply = useCallback(
     async (remote: Pulled, mark: SyncMark) => {
       const backup = parseBackup(remote.data ?? '');
-      await restoreAll(database, backup);
+      await replaceAll(database, backup, 'before_sync');
       const { settings: s, habitsState: h, nutrition: n } = latest.current;
       await Promise.all([h.reload(), n.reload(), s.reload()]);
       // Fingerprinted from what was really stored, so nothing looks changed afterwards.
-      const hash = await fingerprint(await syncSnapshot(database));
-      await saveMark({ ...mark, version: remote.version, hash, dirtySince: null });
+      const stored = await syncSnapshot(database);
+      await saveMark(database, {
+        ...mark,
+        version: remote.version,
+        hash: await fingerprint(stored),
+        dirtySince: null,
+        ticks: summarise(stored).ticks,
+      });
     },
     [database],
   );
@@ -129,13 +155,14 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     }
     const token = current.accessToken;
 
-    let mark = await loadMark(current.userId);
+    let mark = await loadMark(database, current.userId);
     const local = await syncSnapshot(database);
     const localHash = await fingerprint(local);
+    const here = summarise(local);
     const dirty = localHash !== mark.hash;
     if (dirty && mark.version > 0 && mark.dirtySince === null) {
       mark = { ...mark, dirtySince: Date.now() };
-      await saveMark(mark);
+      await saveMark(database, mark);
     }
 
     const push = async (base: number, force = false) => {
@@ -144,8 +171,55 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         { p_data: local, p_base: base, p_force: force },
         token,
       );
-      await saveMark({ ...mark, version, hash: localHash, dirtySince: null });
+      await saveMark(database, {
+        ...mark,
+        version,
+        hash: localHash,
+        dirtySince: null,
+        ticks: here.ticks,
+      });
     };
+    const pullAll = async () => {
+      const all = await rpc<Pulled[]>('sync_pull', { p_have: 0 }, token);
+      const row = Array.isArray(all) ? all[0] : undefined;
+      if (!row) throw new SyncError('offline');
+      return row;
+    };
+    // Neither copy chosen: nothing is changed, and this device stops syncing.
+    const stop = async () => {
+      await signOutOnServer(current);
+      await forget();
+    };
+
+    // A sync that would lose many check-ins is never done without asking. It once emptied
+    // every device after one device's data had been reset. `keepHere` saves this device's
+    // copy over the account; `useAccount` brings the account's copy here.
+    const guard = async (
+      account: Pulled,
+      first: 'keepHere' | 'useAccount',
+    ): Promise<'keepHere' | 'useAccount' | null> => {
+      const there = summarise(account.data ?? '');
+      const counts = `This device: ${here.text}.\nYour account: ${there.text}.`;
+      const options = {
+        useAccount: [
+          'Use your account’s data?',
+          `${counts}\n\nThis device’s data is replaced by the account’s. A copy of this device’s data is kept in Settings → Earlier copies.`,
+          'Use account data',
+        ],
+        keepHere: [
+          'Keep this device’s data?',
+          `${counts}\n\nThe account’s copy is replaced by this device’s, on every device signed in to it.`,
+          'Keep this device’s',
+        ],
+      } as const;
+      const second = first === 'useAccount' ? 'keepHere' : 'useAccount';
+      const ask = ([title, message, label]: readonly [string, string, string]) =>
+        confirmDestructive(title, message, label);
+      if (await ask(options[first])) return first;
+      if (await ask(options[second])) return second;
+      return null;
+    };
+    const losesMany = (from: number, to: number) => from - to >= 5 && from - to > from * 0.2;
 
     const rows = await rpc<Pulled[]>('sync_pull', { p_have: mark.version }, token);
     const remote = Array.isArray(rows) ? rows[0] : undefined;
@@ -153,41 +227,53 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     if (!remote) {
       // Nothing saved to this account yet: this device's data becomes the first copy.
       await push(0);
+    } else if (mark.version === 0 && (await fingerprint(remote.data ?? '')) === localHash) {
+      // Already the same as the account's copy (an update moved where the mark is kept).
+      await saveMark(database, {
+        ...mark,
+        version: remote.version,
+        hash: localHash,
+        dirtySince: null,
+        ticks: here.ticks,
+      });
     } else if (mark.version === 0) {
-      // First sync on this device, and the account already has data.
-      const { habitsState: h, settings: s } = latest.current;
-      const empty = h.habits.length === 0 || !s.onboarded;
-      if (
-        empty ||
-        (await confirmDestructive(
-          'Use your account’s data?',
-          'Your account already has habits saved. Using them replaces what’s on this device.',
-          'Use account data',
-        ))
-      ) {
-        await apply(remote, mark);
-      } else if (
-        await confirmDestructive(
-          'Keep this device’s data instead?',
-          'It will replace what’s saved in your account, on every device signed in to it.',
-          'Keep this device’s',
-        )
-      ) {
-        await push(remote.version, true);
-      } else {
-        // Neither: nothing is changed, and they stay signed out.
-        await signOutOnServer(current);
-        await forget();
-        return;
-      }
+      // First sync on this device, and the account already has data. What's here is read
+      // from the database itself: right after opening the app (Android often restarts it
+      // during Google sign-in) the screens haven't loaded yet and look empty, which once
+      // replaced a phone's whole history without asking.
+      const choice = here.records === 0 ? 'useAccount' : await guard(remote, 'useAccount');
+      if (choice === 'useAccount') await apply(remote, mark);
+      else if (choice === 'keepHere') await push(remote.version, true);
+      else return stop();
     } else if (remote.version !== mark.version) {
       // Another device saved since this one last synced. If this one changed too, the most
-      // recent change wins.
+      // recent change wins, unless that would lose many check-ins on either side.
       const remoteAt = Date.parse(remote.updated_at) || 0;
-      if (!dirty || remoteAt >= (mark.dirtySince ?? 0)) await apply(remote, mark);
-      else await push(remote.version, true);
+      const there = summarise(remote.data ?? '');
+      const remoteWins = !dirty || remoteAt >= (mark.dirtySince ?? 0);
+      const risky = remoteWins
+        ? losesMany(here.ticks, there.ticks)
+        : losesMany(there.ticks, here.ticks);
+      const choice = !risky
+        ? remoteWins
+          ? 'useAccount'
+          : 'keepHere'
+        : await guard(remote, remoteWins ? 'keepHere' : 'useAccount');
+      if (choice === 'useAccount') await apply(remote, mark);
+      else if (choice === 'keepHere') await push(remote.version, true);
+      else return stop();
     } else if (dirty) {
-      await push(mark.version);
+      // Only this device changed. A big drop in check-ins here (say the data was reset)
+      // must not be saved over the account without asking.
+      if (mark.ticks !== undefined && losesMany(mark.ticks, here.ticks)) {
+        const account = await pullAll();
+        const choice = await guard(account, 'useAccount');
+        if (choice === 'useAccount') await apply(account, mark);
+        else if (choice === 'keepHere') await push(account.version, true);
+        else return stop();
+      } else {
+        await push(mark.version);
+      }
     }
     setLastSynced(Date.now());
   }, [apply, database, forget, keep]);

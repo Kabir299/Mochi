@@ -4,7 +4,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 
 import { pickBackup } from '@/lib/backup';
 import { confirmAction, confirmDestructive } from '@/lib/confirm';
-import { restoreAll } from '@/lib/db';
+import { replaceAll } from '@/lib/snapshots';
 import { useHabits } from '@/state/habits';
 import { useNutrition } from '@/state/nutrition';
 import { useSettings } from '@/state/settings';
@@ -48,7 +48,7 @@ export function useRestoreBackup() {
     if (!ok) return false;
 
     try {
-      await restoreAll(database, backup);
+      await replaceAll(database, backup, 'before_restore');
     } catch {
       tell('Can’t restore', 'Nothing was changed. Try again, or save a fresh backup.');
       return false;
