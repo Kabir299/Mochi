@@ -20,10 +20,14 @@ export type SnapshotInfo = {
 const KEEP_DAILY = 7;
 const KEEP_OTHER = 10;
 
-// Not part of the versioned schema, so backups and synced copies stay readable by
-// older versions of the app.
-export async function ensureSnapshotTable(db: SQLiteDatabase) {
+// Tables only this device uses: never exported, backed up or synced. Not part of the
+// versioned schema, so backups and synced copies stay readable by older versions.
+export async function ensureLocalTables(db: SQLiteDatabase) {
   await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS sync_state (
+      key TEXT PRIMARY KEY NOT NULL,
+      value TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS snapshots (
       id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
       made_at TEXT NOT NULL,

@@ -10,7 +10,7 @@ import { AppLock } from '@/components/AppLock';
 import { PurchasesSync } from '@/components/PurchasesSync';
 import { ReminderSync } from '@/components/ReminderSync';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/lib/db';
-import { ensureSnapshotTable, saveDailySnapshot } from '@/lib/snapshots';
+import { ensureLocalTables, saveDailySnapshot } from '@/lib/snapshots';
 import { applyKey, DbChoice, prepareDatabase } from '@/lib/secureDb';
 import { AccountProvider } from '@/state/account';
 import { BuddySyncProvider } from '@/state/buddySync';
@@ -80,7 +80,7 @@ export default function RootLayout() {
     async (database: SQLiteDatabase) => {
       await applyKey(database, key);
       await migrateDbIfNeeded(database);
-      await ensureSnapshotTable(database);
+      await ensureLocalTables(database);
       // A failed copy must never stop the app from opening.
       await saveDailySnapshot(database).catch(() => {});
     },
