@@ -76,7 +76,7 @@ const GOAL_OPTIONS = [
 
 type Step = 'what' | 'when' | 'minutes' | 'full';
 const QUICK_STEPS: Step[] = ['what', 'when', 'minutes'];
-const QUICK_MINUTES = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240];
+const QUICK_MINUTES = [5, 10, 15, 30, 45, 60, 90, 120, 180, 240, 360, 480];
 
 // Waits for habits to load so the form's initial state comes from the saved
 // habit, even when opened by a link or after a reload.
@@ -386,22 +386,11 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
                 </>
               )}
 
-              {step === 'minutes' && timeMode === 'timed' && (
+              {step === 'minutes' && (
                 <View style={styles.field}>
-                  <Text style={styles.question}>Until when?</Text>
-                  <TimeWheel value={endMinute} onChange={setEnd} label="End time" />
-                  <Text style={styles.helper}>
-                    {formatMinute(startMinute)} – {formatMinute(endMinute)} ·{' '}
-                    {formatDuration(durationMin)}
-                    {repeat === 'once' ? ` · ${dayLabel}` : repeat === 'daily' ? ' · every day' : ''}
+                  <Text style={styles.question}>
+                    {timeMode === 'timed' ? 'How long?' : 'About how long?'}
                   </Text>
-                  {error && <Text style={styles.error}>{error}</Text>}
-                </View>
-              )}
-
-              {step === 'minutes' && timeMode !== 'timed' && (
-                <View style={styles.field}>
-                  <Text style={styles.question}>About how long?</Text>
                   <View style={styles.chips}>
                     {QUICK_MINUTES.map((m) => {
                       const on = m === durationMin && customMinutes === '';
@@ -437,16 +426,43 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
                     style={styles.input}
                     maxLength={3}
                   />
+                  {timeMode === 'timed' && (
+                    <>
+                      <Text style={styles.timeLabel}>Or pick when it ends</Text>
+                      <TimeWheel
+                        value={endMinute}
+                        onChange={(m) => {
+                          setEnd(m);
+                          setCustomMinutes('');
+                        }}
+                        label="End time"
+                      />
+                    </>
+                  )}
                   <Text style={styles.helper}>
-                    {`About ${formatDuration(durationMin)}, any time`}
+                    {timeMode === 'timed'
+                      ? `${formatMinute(startMinute)} – ${formatMinute(endMinute)}${
+                          startMinute + durationMin >= DAY_MINUTES ? ' (next day)' : ''
+                        } · ${formatDuration(durationMin)}`
+                      : `About ${formatDuration(durationMin)}, any time`}
                     {repeat === 'once' ? ` · ${dayLabel}` : repeat === 'daily' ? ' · every day' : ''}
                   </Text>
                   {error && <Text style={styles.error}>{error}</Text>}
                 </View>
               )}
 
+              {step === 'minutes' && (
+                <View style={styles.field}>
+                  <Text style={styles.label}>Worth</Text>
+                  <Segmented options={WORTH_OPTIONS} value={worth} onChange={setWorth} />
+                  <Text style={styles.helper}>
+                    How much it counts toward your daily %. High counts three times Low.
+                  </Text>
+                </View>
+              )}
+
               <Pressable onPress={() => setStep('full')} hitSlop={8} style={styles.moreLink}>
-                <Text style={styles.moreText}>More options (worth, count goals, icon)</Text>
+                <Text style={styles.moreText}>More options (count goals, icon)</Text>
               </Pressable>
             </ScrollView>
 
