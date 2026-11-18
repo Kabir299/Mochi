@@ -112,6 +112,10 @@ const styles = themedStyles(() => ({
     padding: spacing.lg,
   },
   card: {
+    // Square day cells would make a full-width grid on a computer taller than the screen.
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
     backgroundColor: colors.card,
     borderRadius: radius.card + 4,
     padding: spacing.lg,

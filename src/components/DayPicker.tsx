@@ -1,4 +1,4 @@
-import { ComponentRef, useCallback, useEffect, useRef } from 'react';
+import { ComponentRef, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -15,17 +15,29 @@ type Props = {
   isFrozen: (day: DateKey) => boolean;
 };
 
-const DAYS_BACK = 30;
-const DAYS_AHEAD = 14;
+const DAYS_BACK = 60;
+const DAYS_AHEAD = 30;
+// Days needed on each side of the selected day so it can sit in the middle of a wide screen.
+const EDGE = 10;
 const ITEM_WIDTH = 48;
 const ITEM_GAP = 6;
 
-// Horizontal strip of dates around the selected day (a month back, two weeks ahead).
+// Horizontal strip of dates around the selected day (two months back, a month ahead).
 export function DayPicker({ today, selected, onSelect, isDayComplete, isFrozen }: Props) {
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const todayKey = toDateKey(today);
-  const dates = Array.from({ length: DAYS_BACK + DAYS_AHEAD + 1 }, (_, i) =>
-    addDays(fromDateKey(selected), i - DAYS_BACK),
+  // The list is anchored to today so tapping a day only scrolls the strip. Rebuilding it around
+  // the selected day moved every date under the finger. It re-anchors on the selected day only
+  // when that day sits too near an end of the list to be centred.
+  const first = toDateKey(addDays(today, EDGE - DAYS_BACK));
+  const last = toDateKey(addDays(today, DAYS_AHEAD - EDGE));
+  const anchorKey = selected < first || selected > last ? selected : todayKey;
+  const dates = useMemo(
+    () =>
+      Array.from({ length: DAYS_BACK + DAYS_AHEAD + 1 }, (_, i) =>
+        addDays(fromDateKey(anchorKey), i - DAYS_BACK),
+      ),
+    [anchorKey],
   );
   const selectedIndex = dates.findIndex((d) => toDateKey(d) === selected);
 
