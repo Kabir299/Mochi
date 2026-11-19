@@ -234,23 +234,6 @@ export function pointsFor(kind: ChallengeKind, amount: number, lockIn: boolean) 
   return lockIn ? Math.round(base * 1.5) : base;
 }
 
-export const RANKS = [
-  { min: 0, name: 'Rookie' },
-  { min: 50, name: 'Challenger' },
-  { min: 150, name: 'Daredevil' },
-  { min: 400, name: 'Unbreakable' },
-  { min: 1000, name: 'Legend' },
-];
-
-export function rankFor(points: number) {
-  let index = 0;
-  RANKS.forEach((r, i) => {
-    if (points >= r.min) index = i;
-  });
-  const next = RANKS[index + 1];
-  return { name: RANKS[index].name, next: next ?? null };
-}
-
 export function parseChallenges(raw: string): Challenge[] {
   if (!raw) return [];
   try {

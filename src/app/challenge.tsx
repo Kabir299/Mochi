@@ -24,6 +24,7 @@ import {
   tierOf,
 } from '@/lib/challenges';
 import { confirmDestructive } from '@/lib/confirm';
+import { CHALLENGE_MULTIPLIER, challengeXp } from '@/lib/league';
 import type { Mood } from '@/lib/encouragement';
 import { closeModal } from '@/lib/nav';
 import { cancelChallengeNotice, scheduleChallengeNotice } from '@/lib/reminders';
@@ -81,7 +82,7 @@ function Accept({
 
   const amount = kind === 'sprint' ? minutes : days;
   const tier = tierOf(kind, amount);
-  const points = pointsFor(kind, amount, kind === 'sprint' && lockIn);
+  const xp = pointsFor(kind, amount, kind === 'sprint' && lockIn) * CHALLENGE_MULTIPLIER;
   const name =
     title.trim() ||
     (kind === 'sprint' ? `${amountLabel({ kind, minutes })} sprint` : `${days}-day run`);
@@ -100,7 +101,7 @@ function Accept({
       'end',
       minutes * 60,
       `${name}: won!`,
-      `${settings.petName}: You did it. +${c.points} points. Come and collect them.`,
+      `${settings.petName}: You did it. +${challengeXp(c)} XP for your league.`,
     ).catch(() => {});
     onSprint(c.id);
   };
@@ -181,8 +182,8 @@ function Accept({
             <View style={styles.flex}>
               <Text style={styles.lockTitle}>Lock-in mode {lockIn ? 'on' : 'off'}</Text>
               <Text style={styles.muted}>
-                Leaving the app (or locking the phone) for over 15 seconds loses it. Worth 1.5×
-                points. The screen stays on.
+                Leaving the app (or locking the phone) for over 15 seconds loses it. Worth 1.5× XP.
+                The screen stays on.
               </Text>
             </View>
           </Pressable>
@@ -190,7 +191,7 @@ function Accept({
 
         <View style={styles.reward}>
           <Text style={[styles.tier, tier === 'boss' && styles.boss]}>{TIER_LABEL[tier]}</Text>
-          <Text style={styles.rewardText}>Win: +{points} points</Text>
+          <Text style={styles.rewardText}>Win: +{xp} XP</Text>
         </View>
 
         <HoldToCommit onDone={accept} />
@@ -304,7 +305,7 @@ function SprintRun({ id }: { id: string }) {
   const mood: Mood = c.status === 'won' ? 'ecstatic' : c.status === 'lost' ? 'sad' : 'okay';
   const line =
     c.status === 'won'
-      ? `WE DID IT! ${amountLabel(c)} conquered. +${c.points} points.`
+      ? `WE DID IT! ${amountLabel(c)} conquered. +${challengeXp(c)} XP.`
       : c.status === 'lost'
         ? c.lostReason === 'Left the app'
           ? 'You left me… the lock-in broke. Next time we’ll get it.'
@@ -353,7 +354,7 @@ function SprintRun({ id }: { id: string }) {
                 color={c.status === 'won' ? colors.streak : colors.textMuted}
               />
               <Text style={styles.resultText}>
-                {c.status === 'won' ? `+${c.points} points` : (c.lostReason ?? 'Lost')}
+                {c.status === 'won' ? `+${challengeXp(c)} XP` : (c.lostReason ?? 'Lost')}
               </Text>
             </View>
             <Pressable onPress={closeModal} style={styles.primary}>

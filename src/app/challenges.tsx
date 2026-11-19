@@ -13,8 +13,6 @@ import {
   ChallengeIdea,
   IDEAS,
   pointsFor,
-  rankFor,
-  RANKS,
   sprintEnd,
   TIER_LABEL,
   tierOf,
@@ -22,7 +20,9 @@ import {
 import { confirmDestructive } from '@/lib/confirm';
 import { addDays, fromDateKey, toDateKey } from '@/lib/dates';
 import { useToday } from '@/lib/useToday';
+import { CHALLENGE_MULTIPLIER, challengeXp, TIERS } from '@/lib/league';
 import { useChallenges } from '@/state/useChallenges';
+import { useLeague } from '@/state/useLeague';
 import { colors, radius, spacing, themedStyles } from '@/theme';
 
 // Event handlers only; render reads the `now` state instead.
@@ -40,10 +40,8 @@ export default function ChallengesScreen() {
     const timer = setInterval(() => setNow(clockNow()), 15_000);
     return () => clearInterval(timer);
   }, []);
-  const rank = rankFor(stats.points);
-  const nextAt = rank.next?.min ?? RANKS[RANKS.length - 1].min;
-  const prevAt = [...RANKS].reverse().find((r) => stats.points >= r.min)?.min ?? 0;
-  const toNext = rank.next ? (stats.points - prevAt) / (nextAt - prevAt) : 1;
+  const league = useLeague();
+  const tier = TIERS[league.tier];
 
   const rollDare = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -75,26 +73,31 @@ export default function ChallengesScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <ModalHeader title="Challenges" />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.rankCard}>
+        <Pressable
+          onPress={() => router.push('/league')}
+          style={({ pressed }) => [styles.rankCard, pressed && styles.pressed]}
+          accessibilityRole="button"
+        >
           <View style={styles.rankRow}>
-            <Ionicons name="trophy" size={30} color={colors.streak} />
+            <View style={[styles.tierDot, { backgroundColor: tier.color }]}>
+              <Ionicons name={tier.icon} size={20} color="#1B1B22" />
+            </View>
             <View style={styles.flex}>
-              <Text style={styles.rankName}>{rank.name}</Text>
+              <Text style={styles.rankName}>
+                #{league.rank} in {tier.name} League
+              </Text>
               <Text style={styles.muted}>
-                {stats.points} pts
-                {rank.next ? ` · ${rank.next.min - stats.points} to ${rank.next.name}` : ''}
+                {league.youXp} XP this week · challenges give {CHALLENGE_MULTIPLIER}× XP
               </Text>
             </View>
-          </View>
-          <View style={styles.track}>
-            <View style={[styles.trackFill, { width: `${Math.round(toNext * 100)}%` }]} />
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </View>
           <View style={styles.statRow}>
             <Stat value={stats.won} label="won" />
             <Stat value={stats.finished - stats.won} label="lost" />
             <Stat value={stats.winStreak} label="wins in a row" />
           </View>
-        </View>
+        </Pressable>
 
         <View style={styles.buttonRow}>
           <Pressable
@@ -158,7 +161,7 @@ export default function ChallengesScreen() {
                 onLongPress={async () => {
                   const ok = await confirmDestructive(
                     'Remove from history?',
-                    `"${c.title}" and its points will be removed.`,
+                    `"${c.title}" and its XP will be removed.`,
                     'Remove',
                   );
                   if (ok) remove(c.id);
@@ -174,7 +177,7 @@ export default function ChallengesScreen() {
                   {c.title}
                 </Text>
                 <Text style={styles.muted}>
-                  {c.status === 'won' ? `+${c.points}` : (c.lostReason ?? 'Lost')}
+                  {c.status === 'won' ? `+${challengeXp(c)} XP` : (c.lostReason ?? 'Lost')}
                 </Text>
               </Pressable>
             ))}
@@ -236,8 +239,8 @@ function RunCard({
         </View>
         <View style={styles.runFoot}>
           <Text style={styles.muted}>
-            Day {Math.min(days, c.doneDays.length + (doneToday ? 0 : 1))} of {days} · +{c.points}{' '}
-            pts
+            Day {Math.min(days, c.doneDays.length + (doneToday ? 0 : 1))} of {days} · +
+            {challengeXp(c)} XP
           </Text>
           <Pressable
             onPress={onTick}
@@ -288,7 +291,9 @@ function IdeaSection({ title, ideas }: { title: string; ideas: ChallengeIdea[] }
                 <Text style={styles.tag}>{amountLabel(idea)}</Text>
                 <Text style={styles.tag}>{CATEGORY_LABEL[idea.category]}</Text>
                 {idea.lockIn && <Text style={styles.tag}>Lock-in</Text>}
-                <Text style={styles.points}>+{pointsFor(idea.kind, amount, !!idea.lockIn)}</Text>
+                <Text style={styles.points}>
+                  +{pointsFor(idea.kind, amount, !!idea.lockIn) * CHALLENGE_MULTIPLIER} XP
+                </Text>
               </View>
             </View>
           </Pressable>
@@ -318,7 +323,14 @@ const styles = themedStyles(() => ({
     gap: spacing.md,
   },
   rankRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  rankName: { color: colors.text, fontSize: 22, fontWeight: '700' },
+  rankName: { color: colors.text, fontSize: 18, fontWeight: '700' },
+  tierDot: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   track: {
     height: 6,
     borderRadius: radius.pill,

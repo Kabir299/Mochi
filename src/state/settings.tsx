@@ -72,6 +72,8 @@ export type Settings = {
   aiBuddyName: string;
   // Accepted challenges as JSON (see lib/challenges.ts).
   challenges: string;
+  // Weekly league tier and past results as JSON (see lib/league.ts).
+  league: string;
 };
 
 const DEFAULTS: Settings = {
@@ -110,6 +112,7 @@ const DEFAULTS: Settings = {
   aiBuddySince: '',
   aiBuddyName: 'Kumo',
   challenges: '',
+  league: '',
 };
 
 type SettingsContextValue = Settings & {
@@ -168,6 +171,7 @@ function parse(raw: Record<string, string>): Settings {
     aiBuddyName: raw.aiBuddyName || DEFAULTS.aiBuddyName,
     profile: raw.profile ?? '',
     challenges: raw.challenges ?? '',
+    league: raw.league ?? '',
   };
 }
 

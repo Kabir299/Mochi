@@ -32,7 +32,9 @@ import { STARTER_HABITS } from '@/lib/starter';
 import { computeDayStreak, streakProgress } from '@/lib/streak';
 import { Habit, useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
+import { TIERS } from '@/lib/league';
 import { useChallenges } from '@/state/useChallenges';
+import { useLeague } from '@/state/useLeague';
 import { useRestoreBackup } from '@/state/useRestoreBackup';
 import { colors, radius, spacing, themedStyles } from '@/theme';
 
@@ -87,6 +89,7 @@ export default function TodayScreen() {
   } = useHabits();
   const settings = useSettings();
   const challenges = useChallenges();
+  const league = useLeague();
   const restoreBackup = useRestoreBackup();
 
   const today = useToday();
@@ -392,10 +395,10 @@ export default function TodayScreen() {
           </View>
           <View style={styles.headerActions}>
             <Pressable
-              onPress={() => router.push('/challenges')}
+              onPress={() => router.push('/league')}
               style={({ pressed }) => [styles.aiButton, pressed && styles.pressed]}
               accessibilityRole="button"
-              accessibilityLabel="Challenges"
+              accessibilityLabel="League and challenges"
             >
               <Ionicons name="trophy-outline" size={20} color={colors.streak} />
             </Pressable>
@@ -448,6 +451,23 @@ export default function TodayScreen() {
             </Pressable>
           )}
         </View>
+
+        {isToday && league.ready && (
+          <Pressable
+            onPress={() => router.push('/league')}
+            style={({ pressed }) => [styles.challengeStrip, pressed && styles.pressed]}
+            accessibilityRole="button"
+          >
+            <View style={[styles.leagueDot, { backgroundColor: TIERS[league.tier].color }]}>
+              <Ionicons name={TIERS[league.tier].icon} size={12} color="#1B1B22" />
+            </View>
+            <Text style={styles.challengeText} numberOfLines={1}>
+              #{league.rank} in {TIERS[league.tier].name} · {league.youXp} XP this week
+              {league.todayXp.total > 0 ? ` · +${league.todayXp.total} today` : ''}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </Pressable>
+        )}
 
         {isToday && challenges.active.length > 0 && (
           <Pressable
@@ -731,6 +751,13 @@ const styles = themedStyles(() => ({
   content: {
     padding: spacing.lg + 4,
     gap: spacing.lg,
+  },
+  leagueDot: {
+    width: 20,
+    height: 20,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   challengeStrip: {
     flexDirection: 'row',

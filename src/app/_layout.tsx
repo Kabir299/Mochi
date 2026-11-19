@@ -61,6 +61,7 @@ function ThemedScreens() {
         <Stack.Screen name="copies" options={{ presentation: 'modal' }} />
         <Stack.Screen name="challenges" options={{ presentation: 'modal' }} />
         <Stack.Screen name="challenge" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="league" options={{ presentation: 'modal' }} />
         <Stack.Screen name="auth" />
       </Stack>
       <ChallengeWatch />
