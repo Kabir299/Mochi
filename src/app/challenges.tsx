@@ -86,9 +86,7 @@ export default function ChallengesScreen() {
               <Text style={styles.rankName}>
                 #{league.rank} in {tier.name} League
               </Text>
-              <Text style={styles.muted}>
-                {league.youXp} XP this week · challenges give {CHALLENGE_MULTIPLIER}× XP
-              </Text>
+              <Text style={styles.muted}>{league.youXp} XP this week · tap for the table</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </View>

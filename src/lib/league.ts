@@ -14,8 +14,11 @@ export const STREAK_DAY_XP = 10;
 export const PERFECT_DAY_XP = 20;
 // Habits can't flood the league: a day's check-ins give at most this (bonuses on top).
 export const DAILY_HABIT_CAP = 150;
-// Challenges are the big earners.
-export const CHALLENGE_MULTIPLIER = 3;
+// A challenge gives its points as XP (10 easy up to 150 for a locked-in boss), a bit more
+// than the same time spent on tasks. Repeating short sprints can't farm the league: a day's
+// challenges give at most this.
+export const CHALLENGE_MULTIPLIER = 1;
+export const DAILY_CHALLENGE_CAP = 150;
 
 export const challengeXp = (c: Pick<Challenge, 'points'>) => c.points * CHALLENGE_MULTIPLIER;
 
@@ -39,9 +42,10 @@ export function dayXp(day: DateKey, s: XpSource) {
     progress === null
       ? 0
       : (progress >= s.threshold ? STREAK_DAY_XP : 0) + (progress >= 1 ? PERFECT_DAY_XP : 0);
-  const challenges = s.challenges
+  const challengeTotal = s.challenges
     .filter((c) => c.status === 'won' && c.endedAt && toDateKey(new Date(c.endedAt)) === day)
     .reduce((sum, c) => sum + challengeXp(c), 0);
+  const challenges = Math.min(DAILY_CHALLENGE_CAP, challengeTotal);
   return { habits, bonus, challenges, total: habits + bonus + challenges };
 }
 
