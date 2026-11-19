@@ -14,9 +14,9 @@ export const STREAK_DAY_XP = 10;
 export const PERFECT_DAY_XP = 20;
 // Habits can't flood the league: a day's check-ins give at most this (bonuses on top).
 export const DAILY_HABIT_CAP = 150;
-// A challenge gives 8 (easy) to 28 (locked-in boss) XP, worked out from its size now, so
-// ones saved under older, bigger values don't count extra. A day's challenges give at most
-// this, so repeating short sprints can't farm the league.
+// Challenge XP comes from its size (see pointsFor), worked out now so ones saved under older,
+// bigger values don't count extra. A day's sprints give at most this, so repeating short ones
+// can't farm the league; finishing a run is never capped.
 export const DAILY_CHALLENGE_CAP = 60;
 
 export const challengeXp = (c: Pick<Challenge, 'kind' | 'minutes' | 'days' | 'lockIn'>) =>
@@ -42,10 +42,12 @@ export function dayXp(day: DateKey, s: XpSource) {
     progress === null
       ? 0
       : (progress >= s.threshold ? STREAK_DAY_XP : 0) + (progress >= 1 ? PERFECT_DAY_XP : 0);
-  const challengeTotal = s.challenges
-    .filter((c) => c.status === 'won' && c.endedAt && toDateKey(new Date(c.endedAt)) === day)
-    .reduce((sum, c) => sum + challengeXp(c), 0);
-  const challenges = Math.min(DAILY_CHALLENGE_CAP, challengeTotal);
+  const won = s.challenges.filter(
+    (c) => c.status === 'won' && c.endedAt && toDateKey(new Date(c.endedAt)) === day,
+  );
+  const xpOf = (kind: Challenge['kind']) =>
+    won.filter((c) => c.kind === kind).reduce((sum, c) => sum + challengeXp(c), 0);
+  const challenges = Math.min(DAILY_CHALLENGE_CAP, xpOf('sprint')) + xpOf('run');
   return { habits, bonus, challenges, total: habits + bonus + challenges };
 }
 

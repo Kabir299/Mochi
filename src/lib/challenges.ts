@@ -213,10 +213,11 @@ export const TIER_LABEL: Record<Tier, string> = {
   boss: 'Boss',
 };
 
-// XP for a win. Kept close to tasks (a high-worth task is 20): a two-hour locked-in boss
-// sprint tops out at 28.
-const TIER_POINTS: Record<Tier, number> = { easy: 8, medium: 14, hard: 20, boss: 25 };
-const LOCK_IN_BONUS = 1.12;
+// XP for a win, set against tasks (a high-worth task is 20). Sprints pay by length: about
+// 10 an hour for the first hour, then 14 an hour, with lock-in worth a sixth more, so a
+// locked-in hour is 12 and two locked-in hours are 28. Runs pay for every day kept up.
+export const RUN_XP_PER_DAY = 8;
+const LOCK_IN_BONUS = 1.17;
 
 export function tierOf(kind: ChallengeKind, amount: number): Tier {
   if (kind === 'sprint') {
@@ -231,10 +232,10 @@ export function tierOf(kind: ChallengeKind, amount: number): Tier {
   return 'boss';
 }
 
-// Lock-in is harder, so it's worth a little more.
 export function pointsFor(kind: ChallengeKind, amount: number, lockIn: boolean) {
-  const base = TIER_POINTS[tierOf(kind, amount)];
-  return lockIn ? Math.round(base * LOCK_IN_BONUS) : base;
+  if (kind === 'run') return amount * RUN_XP_PER_DAY;
+  const base = amount <= 60 ? amount / 6 : 10 + ((amount - 60) * 14) / 60;
+  return Math.max(1, Math.round(lockIn ? base * LOCK_IN_BONUS : base));
 }
 
 export function parseChallenges(raw: string): Challenge[] {
