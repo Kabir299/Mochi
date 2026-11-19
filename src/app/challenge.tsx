@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { withoutLockIn } from '@/components/ChallengeWatch';
 import { Confetti } from '@/components/Confetti';
 import { HoldToCommit } from '@/components/HoldToCommit';
 import { ModalHeader } from '@/components/ModalHeader';
@@ -16,7 +17,6 @@ import {
   Challenge,
   ChallengeKind,
   IDEAS,
-  LOCK_IN_GRACE_MS,
   newChallenge,
   pointsFor,
   sprintEnd,
@@ -247,39 +247,13 @@ function SprintRun({ id }: { id: string }) {
     wasActive.current = active;
   }, [active, c?.status]);
 
-  // Lock-in: leaving starts a 15-second grace; coming back late loses it.
+  // Coming back within the grace (ChallengeWatch clears awaySince) gets a "phew".
+  const wasAway = useRef(false);
   useEffect(() => {
-    if (!active) return;
-    const sub = AppState.addEventListener('change', (state) => {
-      const cur = latest.current.c;
-      if (!cur || cur.status !== 'active' || !cur.lockIn) return;
-      if (state === 'background' && !cur.awaySince) {
-        latest.current.change(cur.id, { awaySince: Date.now() });
-        scheduleChallengeNotice(
-          'warn',
-          1,
-          'Come back!',
-          `${cur.title} breaks in 15 seconds unless you return to Mochi.`,
-        ).catch(() => {});
-      } else if (state === 'active' && cur.awaySince) {
-        cancelChallengeNotice('warn').catch(() => {});
-        const away = Date.now() - cur.awaySince;
-        if (away > LOCK_IN_GRACE_MS) {
-          latest.current.change(cur.id, {
-            status: 'lost',
-            endedAt: Date.now(),
-            awaySince: undefined,
-            lostReason: 'Left the app',
-          });
-          cancelChallengeNotice('end').catch(() => {});
-        } else {
-          latest.current.change(cur.id, { awaySince: undefined });
-          setCloseCall(true);
-        }
-      }
-    });
-    return () => sub.remove();
-  }, [active]);
+    const away = !!c?.awaySince;
+    if (wasAway.current && !away && c?.status === 'active') setCloseCall(true);
+    wasAway.current = away;
+  }, [c?.awaySince, c?.status]);
 
   useEffect(() => {
     if (!active) return;
@@ -315,10 +289,12 @@ function SprintRun({ id }: { id: string }) {
       : `${mm}:${ss}`;
 
   const giveUp = async () => {
-    const ok = await confirmDestructive(
-      'Give up?',
-      `${settings.petName} will be sad, and "${c.title}" goes in your history as lost.`,
-      'Give up',
+    const ok = await withoutLockIn(() =>
+      confirmDestructive(
+        'Give up?',
+        `${settings.petName} will be sad, and "${c.title}" goes in your history as lost.`,
+        'Give up',
+      ),
     );
     if (!ok) return;
     change(c.id, { status: 'lost', endedAt: Date.now(), lostReason: 'Gave up' });

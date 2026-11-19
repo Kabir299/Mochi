@@ -7,6 +7,7 @@ import * as SystemUI from 'expo-system-ui';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppLock } from '@/components/AppLock';
+import { ChallengeWatch } from '@/components/ChallengeWatch';
 import { PurchasesSync } from '@/components/PurchasesSync';
 import { ReminderSync } from '@/components/ReminderSync';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/lib/db';
@@ -62,6 +63,7 @@ function ThemedScreens() {
         <Stack.Screen name="challenge" options={{ presentation: 'modal' }} />
         <Stack.Screen name="auth" />
       </Stack>
+      <ChallengeWatch />
       <AppLock />
     </Fragment>
   );
