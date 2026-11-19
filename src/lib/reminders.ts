@@ -128,6 +128,35 @@ export async function cancelFocusEnd(id: string | null) {
   await Notifications.cancelScheduledNotificationAsync(id);
 }
 
+// Challenge notices: "end" rings when a sprint is won, "warn" right after leaving a lock-in.
+// Fixed ids, so a new one replaces the old and they can be cancelled without storing anything.
+export async function scheduleChallengeNotice(
+  kind: 'end' | 'warn',
+  seconds: number,
+  title: string,
+  body: string,
+) {
+  if (!remindersSupported) return;
+  const Notifications = await notifications();
+  if (!(await Notifications.getPermissionsAsync()).granted) return;
+  await ensureChannel(Notifications);
+  await Notifications.scheduleNotificationAsync({
+    identifier: `challenge-${kind}`,
+    content: { title, body },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: Math.max(1, Math.round(seconds)),
+      channelId: CHANNEL,
+    },
+  });
+}
+
+export async function cancelChallengeNotice(kind: 'end' | 'warn') {
+  if (!remindersSupported) return;
+  const Notifications = await notifications();
+  await Notifications.cancelScheduledNotificationAsync(`challenge-${kind}`);
+}
+
 // "5 min" / "1 h 30 min" for reminder text.
 function minutesText(min: number) {
   const h = Math.floor(min / 60);

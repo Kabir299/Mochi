@@ -32,6 +32,7 @@ import { STARTER_HABITS } from '@/lib/starter';
 import { computeDayStreak, streakProgress } from '@/lib/streak';
 import { Habit, useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
+import { useChallenges } from '@/state/useChallenges';
 import { useRestoreBackup } from '@/state/useRestoreBackup';
 import { colors, radius, spacing, themedStyles } from '@/theme';
 
@@ -85,6 +86,7 @@ export default function TodayScreen() {
     moveHabit,
   } = useHabits();
   const settings = useSettings();
+  const challenges = useChallenges();
   const restoreBackup = useRestoreBackup();
 
   const today = useToday();
@@ -390,6 +392,14 @@ export default function TodayScreen() {
           </View>
           <View style={styles.headerActions}>
             <Pressable
+              onPress={() => router.push('/challenges')}
+              style={({ pressed }) => [styles.aiButton, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Challenges"
+            >
+              <Ionicons name="trophy-outline" size={20} color={colors.streak} />
+            </Pressable>
+            <Pressable
               onPress={() => setCalendarOpen(true)}
               style={({ pressed }) => [styles.aiButton, pressed && styles.pressed]}
               accessibilityRole="button"
@@ -438,6 +448,26 @@ export default function TodayScreen() {
             </Pressable>
           )}
         </View>
+
+        {isToday && challenges.active.length > 0 && (
+          <Pressable
+            onPress={() => router.push('/challenges')}
+            style={({ pressed }) => [styles.challengeStrip, pressed && styles.pressed]}
+            accessibilityRole="button"
+          >
+            <Ionicons name="trophy" size={16} color={colors.streak} />
+            <Text style={styles.challengeText} numberOfLines={1}>
+              {challenges.active
+                .map((c) =>
+                  c.kind === 'run'
+                    ? `${c.title} ${c.doneDays.includes(todayKey) ? '✓' : `· day ${c.doneDays.length + 1}/${c.days}`}`
+                    : `${c.title} · running`,
+                )
+                .join('   ')}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </Pressable>
+        )}
 
         {showFreezeNotice && (
           <Pressable onPress={() => setFreezeSeen(true)} style={styles.notice}>
@@ -650,13 +680,7 @@ export default function TodayScreen() {
       {tourOn && !menuHabit && !aiMenu && (
         <Spotlight
           stepKey={tourStep}
-          target={
-            tourStep === 'add'
-              ? addRef
-              : tourStep === 'tick'
-                ? rowRef
-                : undefined
-          }
+          target={tourStep === 'add' ? addRef : tourStep === 'tick' ? rowRef : undefined}
           refreshKey={layoutTick}
           scrollBy={(dy) =>
             scroller.current?.scrollTo({ y: scrollY.current + dy, animated: false })
@@ -707,6 +731,21 @@ const styles = themedStyles(() => ({
   content: {
     padding: spacing.lg + 4,
     gap: spacing.lg,
+  },
+  challengeStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.proBg,
+    borderRadius: radius.card,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  challengeText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',

@@ -70,6 +70,8 @@ export type Settings = {
   // The day the AI buddy was turned on, or '' when it's off.
   aiBuddySince: string;
   aiBuddyName: string;
+  // Accepted challenges as JSON (see lib/challenges.ts).
+  challenges: string;
 };
 
 const DEFAULTS: Settings = {
@@ -107,6 +109,7 @@ const DEFAULTS: Settings = {
   syncSecret: '',
   aiBuddySince: '',
   aiBuddyName: 'Kumo',
+  challenges: '',
 };
 
 type SettingsContextValue = Settings & {
@@ -164,6 +167,7 @@ function parse(raw: Record<string, string>): Settings {
     aiBuddySince: raw.aiBuddySince ?? '',
     aiBuddyName: raw.aiBuddyName || DEFAULTS.aiBuddyName,
     profile: raw.profile ?? '',
+    challenges: raw.challenges ?? '',
   };
 }
 

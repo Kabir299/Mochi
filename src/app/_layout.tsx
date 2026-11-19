@@ -23,7 +23,8 @@ import { applyTheme, colors } from '@/theme';
 function ThemedScreens() {
   const settings = useSettings();
   const phone = useColorScheme();
-  const mode = settings.theme === 'system' ? (phone === 'light' ? 'light' : 'dark') : settings.theme;
+  const mode =
+    settings.theme === 'system' ? (phone === 'light' ? 'light' : 'dark') : settings.theme;
   applyTheme(mode);
 
   useEffect(() => {
@@ -57,6 +58,8 @@ function ThemedScreens() {
         <Stack.Screen name="share-card" options={{ presentation: 'modal' }} />
         <Stack.Screen name="buddies" options={{ presentation: 'modal' }} />
         <Stack.Screen name="copies" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="challenges" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="challenge" options={{ presentation: 'modal' }} />
         <Stack.Screen name="auth" />
       </Stack>
       <AppLock />
