@@ -27,14 +27,19 @@ export function ChallengeWatch() {
     latest.current = { c: sprint, change };
   });
   const watching = !!sprint;
+  // Kept here as well as in the saved challenge: a background tab can be paused before the
+  // saved change has been drawn, so the screen's copy may not know they left yet.
+  // null: not known here (e.g. after a reload), so the saved copy decides; 0: here.
+  const awayAt = useRef<number | null>(null);
 
   useEffect(() => {
     if (!watching) return;
 
     const leave = () => {
       const cur = latest.current.c;
-      if (paused || !cur || cur.awaySince) return;
-      latest.current.change(cur.id, { awaySince: Date.now() });
+      if (paused || !cur || awayAt.current) return;
+      awayAt.current = (awayAt.current === null && cur.awaySince) || Date.now();
+      latest.current.change(cur.id, { awaySince: awayAt.current });
       scheduleChallengeNotice(
         'warn',
         1,
@@ -44,6 +49,7 @@ export function ChallengeWatch() {
     };
 
     const lose = (cur: Challenge) => {
+      awayAt.current = 0;
       latest.current.change(cur.id, {
         status: 'lost',
         endedAt: Date.now(),
@@ -55,20 +61,25 @@ export function ChallengeWatch() {
 
     const back = () => {
       const cur = latest.current.c;
-      if (!cur?.awaySince) return;
+      const since = awayAt.current === null ? cur?.awaySince : awayAt.current;
+      if (!cur || !since) return;
+      awayAt.current = 0;
       cancelChallengeNotice('warn').catch(() => {});
-      if (Date.now() - cur.awaySince > LOCK_IN_GRACE_MS) lose(cur);
+      if (Date.now() - since > LOCK_IN_GRACE_MS) lose(cur);
       else latest.current.change(cur.id, { awaySince: undefined });
     };
 
     // Ends it on time even while still away (web timers keep running in the background).
     const timer = setInterval(() => {
       const cur = latest.current.c;
-      if (cur?.awaySince && Date.now() - cur.awaySince > LOCK_IN_GRACE_MS) lose(cur);
+      const since = awayAt.current === null ? cur?.awaySince : awayAt.current;
+      if (cur && since && Date.now() - since > LOCK_IN_GRACE_MS) lose(cur);
     }, 1000);
 
     if (Platform.OS === 'web') {
-      const onVisibility = () => (document.hidden ? leave() : document.hasFocus() && back());
+      // Coming back to the tab counts as back even before the window regains focus; phones'
+      // browsers often never send that focus event.
+      const onVisibility = () => (document.hidden ? leave() : back());
       document.addEventListener('visibilitychange', onVisibility);
       window.addEventListener('blur', leave);
       window.addEventListener('focus', back);
