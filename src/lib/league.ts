@@ -1,4 +1,4 @@
-import type { Challenge } from '@/lib/challenges';
+import { Challenge, pointsFor } from '@/lib/challenges';
 import { addDays, DateKey, fromDateKey, toDateKey } from '@/lib/dates';
 import type { Habit } from '@/state/habits';
 
@@ -14,13 +14,13 @@ export const STREAK_DAY_XP = 10;
 export const PERFECT_DAY_XP = 20;
 // Habits can't flood the league: a day's check-ins give at most this (bonuses on top).
 export const DAILY_HABIT_CAP = 150;
-// A challenge gives its points as XP (10 easy up to 150 for a locked-in boss), a bit more
-// than the same time spent on tasks. Repeating short sprints can't farm the league: a day's
-// challenges give at most this.
-export const CHALLENGE_MULTIPLIER = 1;
-export const DAILY_CHALLENGE_CAP = 150;
+// A challenge gives 8 (easy) to 28 (locked-in boss) XP, worked out from its size now, so
+// ones saved under older, bigger values don't count extra. A day's challenges give at most
+// this, so repeating short sprints can't farm the league.
+export const DAILY_CHALLENGE_CAP = 60;
 
-export const challengeXp = (c: Pick<Challenge, 'points'>) => c.points * CHALLENGE_MULTIPLIER;
+export const challengeXp = (c: Pick<Challenge, 'kind' | 'minutes' | 'days' | 'lockIn'>) =>
+  pointsFor(c.kind, (c.kind === 'sprint' ? c.minutes : c.days) ?? 1, c.lockIn);
 
 export type XpSource = {
   allHabits: Habit[];

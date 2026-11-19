@@ -20,7 +20,7 @@ import {
 import { confirmDestructive } from '@/lib/confirm';
 import { addDays, fromDateKey, toDateKey } from '@/lib/dates';
 import { useToday } from '@/lib/useToday';
-import { CHALLENGE_MULTIPLIER, challengeXp, TIERS } from '@/lib/league';
+import { challengeXp, TIERS } from '@/lib/league';
 import { useChallenges } from '@/state/useChallenges';
 import { useLeague } from '@/state/useLeague';
 import { colors, radius, spacing, themedStyles } from '@/theme';
@@ -289,9 +289,7 @@ function IdeaSection({ title, ideas }: { title: string; ideas: ChallengeIdea[] }
                 <Text style={styles.tag}>{amountLabel(idea)}</Text>
                 <Text style={styles.tag}>{CATEGORY_LABEL[idea.category]}</Text>
                 {idea.lockIn && <Text style={styles.tag}>Lock-in</Text>}
-                <Text style={styles.points}>
-                  +{pointsFor(idea.kind, amount, !!idea.lockIn) * CHALLENGE_MULTIPLIER} XP
-                </Text>
+                <Text style={styles.points}>+{pointsFor(idea.kind, amount, !!idea.lockIn)} XP</Text>
               </View>
             </View>
           </Pressable>

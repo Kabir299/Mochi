@@ -24,7 +24,7 @@ import {
   tierOf,
 } from '@/lib/challenges';
 import { confirmDestructive } from '@/lib/confirm';
-import { CHALLENGE_MULTIPLIER, challengeXp } from '@/lib/league';
+import { challengeXp } from '@/lib/league';
 import type { Mood } from '@/lib/encouragement';
 import { closeModal } from '@/lib/nav';
 import { cancelChallengeNotice, scheduleChallengeNotice } from '@/lib/reminders';
@@ -82,7 +82,7 @@ function Accept({
 
   const amount = kind === 'sprint' ? minutes : days;
   const tier = tierOf(kind, amount);
-  const xp = pointsFor(kind, amount, kind === 'sprint' && lockIn) * CHALLENGE_MULTIPLIER;
+  const xp = pointsFor(kind, amount, kind === 'sprint' && lockIn);
   const name =
     title.trim() ||
     (kind === 'sprint' ? `${amountLabel({ kind, minutes })} sprint` : `${days}-day run`);
@@ -182,8 +182,8 @@ function Accept({
             <View style={styles.flex}>
               <Text style={styles.lockTitle}>Lock-in mode {lockIn ? 'on' : 'off'}</Text>
               <Text style={styles.muted}>
-                Leaving the app (or locking the phone) for over 15 seconds loses it. Worth 1.5× XP.
-                The screen stays on.
+                Leaving the app (or locking the phone) for over 15 seconds loses it. Worth a little
+                more XP. The screen stays on.
               </Text>
             </View>
           </Pressable>

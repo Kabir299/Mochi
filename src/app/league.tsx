@@ -131,9 +131,7 @@ export default function LeagueScreen() {
           <Ionicons name="flash" size={22} color={colors.onAccent} />
           <View style={styles.flex}>
             <Text style={styles.boostTitle}>Take a challenge</Text>
-            <Text style={styles.boostSub}>
-              Win 10–150 XP each, up to {DAILY_CHALLENGE_CAP} a day
-            </Text>
+            <Text style={styles.boostSub}>Win 8–28 XP each, up to {DAILY_CHALLENGE_CAP} a day</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.onAccent} />
         </Pressable>
@@ -202,7 +200,7 @@ export default function LeagueScreen() {
           <XpLine icon="checkmark-circle" label="High-worth task" xp={HABIT_XP[3]} />
           <XpLine icon="flame-outline" label="Day that keeps your streak" xp={STREAK_DAY_XP} />
           <XpLine icon="star-outline" label="Perfect 100% day" xp={PERFECT_DAY_XP} />
-          <XpLine icon="trophy-outline" label="Win a challenge" text="10–150" />
+          <XpLine icon="trophy-outline" label="Win a challenge" text="8–28" />
           <Text style={styles.muted}>
             Tasks count up to {DAILY_HABIT_CAP} XP a day and challenges up to {DAILY_CHALLENGE_CAP}.
             Top {PROMOTE} move up a league each Monday, bottom {DEMOTE} move down. Rivals get

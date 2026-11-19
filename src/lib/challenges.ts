@@ -213,7 +213,10 @@ export const TIER_LABEL: Record<Tier, string> = {
   boss: 'Boss',
 };
 
-const TIER_POINTS: Record<Tier, number> = { easy: 10, medium: 25, hard: 50, boss: 100 };
+// XP for a win. Kept close to tasks (a high-worth task is 20): a two-hour locked-in boss
+// sprint tops out at 28.
+const TIER_POINTS: Record<Tier, number> = { easy: 8, medium: 14, hard: 20, boss: 25 };
+const LOCK_IN_BONUS = 1.12;
 
 export function tierOf(kind: ChallengeKind, amount: number): Tier {
   if (kind === 'sprint') {
@@ -228,10 +231,10 @@ export function tierOf(kind: ChallengeKind, amount: number): Tier {
   return 'boss';
 }
 
-// Lock-in is harder, so it's worth half again as much.
+// Lock-in is harder, so it's worth a little more.
 export function pointsFor(kind: ChallengeKind, amount: number, lockIn: boolean) {
   const base = TIER_POINTS[tierOf(kind, amount)];
-  return lockIn ? Math.round(base * 1.5) : base;
+  return lockIn ? Math.round(base * LOCK_IN_BONUS) : base;
 }
 
 export function parseChallenges(raw: string): Challenge[] {
