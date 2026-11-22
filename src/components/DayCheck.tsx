@@ -18,7 +18,7 @@ export function DayCheck({ today }: { today: Date }) {
   const status = yesterdayStatus(
     firstDay,
     today,
-    withRestDays(dayProgress, settings.isPro ? settings.restDays : '', settings.streakThreshold),
+    withRestDays(dayProgress, settings.restDays, settings.streakThreshold),
     settings.repairedDays,
     settings.streakThreshold,
     settings.freezesPerMonth,

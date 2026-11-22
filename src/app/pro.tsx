@@ -42,11 +42,6 @@ const FEATURES: { icon: IconName; title: string; body: string }[] = [
     body: 'Say what’s on your mind and get a timed plan; chat with a coach who knows your habits.',
   },
   {
-    icon: 'bed-outline',
-    title: 'Rest days',
-    body: 'Pick days off, like Sunday, that never break your streak.',
-  },
-  {
     icon: 'restaurant-outline',
     title: 'Calorie tracking',
     body: 'Log meals with AI-estimated calories and protein against your daily goals.',

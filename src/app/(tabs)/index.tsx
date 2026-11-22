@@ -132,7 +132,7 @@ export default function TodayScreen() {
     today,
     streakProgress(dayProgress, {
       repairedDays: settings.repairedDays,
-      restDays: settings.isPro ? settings.restDays : '',
+      restDays: settings.restDays,
       threshold: settings.streakThreshold,
     }),
     settings.streakThreshold,

@@ -44,7 +44,7 @@ export default function ProgressScreen() {
     today,
     streakProgress(dayProgress, {
       repairedDays: settings.repairedDays,
-      restDays: settings.isPro ? settings.restDays : '',
+      restDays: settings.restDays,
       threshold: settings.streakThreshold,
     }),
     settings.streakThreshold,

@@ -189,21 +189,16 @@ export default function SettingsScreen() {
             />
           </View>
           <View style={styles.restHead}>
-            <Text style={styles.label}>Rest days</Text>
-            {!settings.isPro && <Text style={styles.proBadge}>PRO</Text>}
+            <Text style={styles.label}>Days off for every habit</Text>
           </View>
           <View style={styles.leadRow}>
             {WEEKDAYS.map(([wd, label]) => {
               const rest = settings.restDays.split(',').filter(Boolean).map(Number);
-              const on = settings.isPro && rest.includes(wd);
+              const on = rest.includes(wd);
               return (
                 <Pressable
                   key={wd}
                   onPress={() => {
-                    if (!settings.isPro) {
-                      router.push('/pro');
-                      return;
-                    }
                     const next = on ? rest.filter((d) => d !== wd) : [...rest, wd];
                     settings.update({ restDays: next.join(',') });
                   }}
@@ -217,9 +212,8 @@ export default function SettingsScreen() {
             })}
           </View>
           <Text style={styles.hint}>
-            {settings.isPro
-              ? 'Skipping these days won’t break your streak. Doing them still counts.'
-              : 'Take a day off without losing your streak. Part of Pro.'}
+            Skipping these days won’t break any streak. Doing them still counts. To rest just one
+            habit, pick its days off when you edit it.
           </Text>
         </Section>
 
@@ -574,16 +568,6 @@ const styles = themedStyles(() => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-  },
-  proBadge: {
-    color: colors.streak,
-    backgroundColor: colors.proBg,
-    fontSize: 10,
-    fontWeight: '700',
-    borderRadius: radius.pill,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    overflow: 'hidden',
   },
   leadRow: {
     flexDirection: 'row',

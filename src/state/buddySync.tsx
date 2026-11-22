@@ -133,7 +133,7 @@ export function BuddySyncProvider({ children }: { children: ReactNode }) {
         day,
         streakProgress(h.dayProgress, {
           repairedDays: s.repairedDays,
-          restDays: s.isPro ? s.restDays : '',
+          restDays: s.restDays,
           threshold: s.streakThreshold,
         }),
         s.streakThreshold,

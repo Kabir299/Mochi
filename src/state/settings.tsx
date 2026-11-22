@@ -97,7 +97,7 @@ const DEFAULTS: Settings = {
   repairedDays: '',
   repairPending: '',
   dayCheckSeen: '',
-  restDays: '0',
+  restDays: '',
   focusKeepAwake: false,
   guideSeen: false,
   nutritionGuideSeen: false,

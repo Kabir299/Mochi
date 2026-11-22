@@ -30,6 +30,9 @@ export type HabitRecord = {
   sort_order: number;
   // Local day the habit starts counting; null means the day it was created.
   start_day: DateKey | null;
+  // Comma-separated weekdays (0 = Sunday) that are days off: skipping them doesn't break the
+  // habit's streak. Null when there are none.
+  rest_days: string | null;
   // SQLite UTC timestamp, "YYYY-MM-DD HH:MM:SS".
   created_at: string;
 };
@@ -72,7 +75,7 @@ export type GymLog = {
   minutes: number;
 };
 
-const DATABASE_VERSION = 9;
+const DATABASE_VERSION = 10;
 
 // Runs before the app renders. Each schema change gets its own
 // `if (version === N)` step so existing installs upgrade in place.
@@ -188,12 +191,17 @@ export async function migrateDbIfNeeded(db: SQLiteDatabase) {
     version = 9;
   }
 
+  if (version === 9) {
+    await db.execAsync(`ALTER TABLE habits ADD COLUMN rest_days TEXT;`);
+    version = 10;
+  }
+
   await db.execAsync(`PRAGMA user_version = ${DATABASE_VERSION}`);
 }
 
 export function getHabits(db: SQLiteDatabase) {
   return db.getAllAsync<HabitRecord>(
-    'SELECT id, name, icon, target, unit, repeat, weight, start_minute, duration_min, days, once_day, start_day, archived, sort_order, created_at FROM habits ORDER BY sort_order, id',
+    'SELECT id, name, icon, target, unit, repeat, weight, start_minute, duration_min, days, once_day, start_day, rest_days, archived, sort_order, created_at FROM habits ORDER BY sort_order, id',
   );
 }
 
@@ -203,7 +211,7 @@ export function getLogs(db: SQLiteDatabase) {
 
 export async function insertHabit(db: SQLiteDatabase, input: HabitInput) {
   const result = await db.runAsync(
-    'INSERT INTO habits (sort_order, name, icon, target, unit, repeat, weight, start_minute, duration_min, days, once_day, start_day) VALUES ((SELECT COALESCE(MAX(sort_order), 0) + 1 FROM habits), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO habits (sort_order, name, icon, target, unit, repeat, weight, start_minute, duration_min, days, once_day, start_day, rest_days) VALUES ((SELECT COALESCE(MAX(sort_order), 0) + 1 FROM habits), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     input.name,
     input.icon,
     input.target,
@@ -215,13 +223,14 @@ export async function insertHabit(db: SQLiteDatabase, input: HabitInput) {
     input.days,
     input.once_day,
     input.start_day,
+    input.rest_days,
   );
   return result.lastInsertRowId;
 }
 
 export async function updateHabit(db: SQLiteDatabase, id: number, input: HabitInput) {
   await db.runAsync(
-    'UPDATE habits SET name = ?, icon = ?, target = ?, unit = ?, repeat = ?, weight = ?, start_minute = ?, duration_min = ?, days = ?, once_day = ?, start_day = ? WHERE id = ?',
+    'UPDATE habits SET name = ?, icon = ?, target = ?, unit = ?, repeat = ?, weight = ?, start_minute = ?, duration_min = ?, days = ?, once_day = ?, start_day = ?, rest_days = ? WHERE id = ?',
     input.name,
     input.icon,
     input.target,
@@ -233,6 +242,7 @@ export async function updateHabit(db: SQLiteDatabase, id: number, input: HabitIn
     input.days,
     input.once_day,
     input.start_day,
+    input.rest_days,
     id,
   );
 }

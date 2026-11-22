@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import * as db from '@/lib/db';
+import { useSettings } from '@/state/settings';
 import { addDays, DateKey, fromDateKey, sqliteUtcToDateKey, toDateKey } from '@/lib/dates';
 
 export type IconName = keyof typeof Ionicons.glyphMap;
@@ -39,10 +40,14 @@ export type Habit = {
   sortOrder: number;
   // Local day the habit was created; earlier days don't count against it.
   startDay: DateKey;
+  // Weekdays (0 = Sunday) that are days off: skipping them doesn't break this habit's
+  // streak or pull down the day's progress. Doing it anyway still counts.
+  restDays: number[];
 };
-// startDay is optional when creating: it defaults to today.
-export type HabitInput = Omit<Habit, 'id' | 'startDay' | 'archived' | 'sortOrder'> & {
+// startDay and restDays are optional when creating: today, and no days off.
+export type HabitInput = Omit<Habit, 'id' | 'startDay' | 'archived' | 'sortOrder' | 'restDays'> & {
   startDay?: DateKey;
+  restDays?: number[];
 };
 
 export type DayEntry = { note: string | null; mood: number | null; spentMin: number };
@@ -98,6 +103,7 @@ function fromRecord({
   days,
   once_day,
   start_day,
+  rest_days,
   start_minute,
   duration_min,
   archived,
@@ -114,6 +120,7 @@ function fromRecord({
     days: days ? days.split(',').map(Number) : [],
     onceDay: once_day,
     startDay: start_day ?? sqliteUtcToDateKey(created_at),
+    restDays: rest_days ? rest_days.split(',').map(Number) : [],
   };
 }
 
@@ -131,6 +138,7 @@ function toRecordInput(input: HabitInput): db.HabitInput {
     days: input.repeat === 'days' ? input.days.join(',') : null,
     once_day: input.repeat === 'once' ? input.onceDay : null,
     start_day: input.startDay ?? null,
+    rest_days: input.restDays?.length ? [...input.restDays].sort().join(',') : null,
   };
 }
 
@@ -221,6 +229,16 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
     [habits],
   );
 
+  // Days off: the habit's own, plus the ones in Settings that apply to every habit.
+  const { restDays: everyoneRest } = useSettings();
+  const isDayOff = useCallback(
+    (habit: Habit, day: DateKey) => {
+      const wd = fromDateKey(day).getDay();
+      return habit.restDays.includes(wd) || everyoneRest.split(',').includes(String(wd));
+    },
+    [everyoneRest],
+  );
+
   const habitsOn = useCallback(
     (day: DateKey) => habits.filter((h) => isScheduled(h, day)),
     [habits],
@@ -246,7 +264,11 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
   // habit counts three times a low one. Null when nothing was scheduled.
   const dayProgress = useCallback(
     (day: DateKey) => {
-      const active = habitsOn(day);
+      // A habit on its own day off only counts once it's done, so skipping it can't pull the
+      // day down. (Days off for every habit are handled by the day streak itself.)
+      const active = habitsOn(day).filter(
+        (h) => !h.restDays.includes(fromDateKey(day).getDay()) || habitProgress(h, day) >= 1,
+      );
       if (active.length === 0) return null;
       const totalWeight = active.reduce((sum, h) => sum + h.weight, 0);
       return active.reduce((sum, h) => sum + h.weight * habitProgress(h, day), 0) / totalWeight;
@@ -254,8 +276,8 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
     [habitsOn, habitProgress],
   );
 
-  // Counts consecutive scheduled days that were done. Unscheduled days are
-  // skipped, and today not being done yet doesn't break the streak.
+  // Counts consecutive scheduled days that were done. Unscheduled days and skipped days off
+  // are passed over, and today not being done yet doesn't break the streak.
   const streakFor = useCallback(
     (habit: Habit, today: Date) => {
       if (habit.repeat === 'once') return 0;
@@ -266,11 +288,11 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
         if (key < habit.startDay) break;
         if (!isScheduled(habit, key)) continue;
         if (isDone(habit, key)) streak++;
-        else if (i > 0) break;
+        else if (i > 0 && !isDayOff(habit, key)) break;
       }
       return streak;
     },
-    [isDone],
+    [isDone, isDayOff],
   );
 
   const setCount = useCallback(
@@ -318,6 +340,7 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
           ...input,
           id,
           startDay: input.startDay ?? toDateKey(new Date()),
+          restDays: input.restDays ?? [],
           archived: false,
           sortOrder: Math.max(0, ...prev.map((h) => h.sortOrder)) + 1,
         },
@@ -328,10 +351,12 @@ export function HabitsProvider({ children }: { children: ReactNode }) {
 
   const editHabit = useCallback(
     async (id: number, input: HabitInput) => {
-      await db.updateHabit(database, id, toRecordInput(input));
-      setAllHabits((prev) => prev.map((h) => (h.id === id ? { ...h, ...input } : h)));
+      // Edits that don't mention days off keep the ones the habit has.
+      const full = { ...input, restDays: input.restDays ?? getHabit(id)?.restDays ?? [] };
+      await db.updateHabit(database, id, toRecordInput(full));
+      setAllHabits((prev) => prev.map((h) => (h.id === id ? { ...h, ...full } : h)));
     },
-    [database],
+    [database, getHabit],
   );
 
   const removeHabit = useCallback(

@@ -15,9 +15,8 @@ export function ReminderSync() {
   const settings = useSettings();
   // Alarms set before exact timing was allowed stay approximate, so reschedule when it changes.
   const exact = useExactTiming();
-  // No "streak at risk" nudge on a Pro rest day.
-  const restToday =
-    settings.isPro && settings.restDays.split(',').includes(String(new Date().getDay()));
+  // No "streak at risk" nudge on a rest day.
+  const restToday = settings.restDays.split(',').includes(String(new Date().getDay()));
   const streakSecured =
     restToday || (dayProgress(toDateKey(new Date())) ?? 0) >= settings.streakThreshold;
 

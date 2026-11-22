@@ -153,6 +153,7 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
     existing?.days.length ? existing.days : [1, 2, 3, 4, 5],
   );
   const [daysError, setDaysError] = useState(false);
+  const [restDays, setRestDays] = useState<number[]>(existing?.restDays ?? []);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   // New tasks are added one question at a time; editing shows everything at once.
@@ -208,6 +209,9 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
       // The quick flow always asks how long, which also helps Plan my day place it.
       durationMin: timeMode === 'timed' || quick ? durationMin : null,
       days: [...days].sort(),
+      // Only days the habit actually runs can be days off.
+      restDays:
+        repeat === 'once' ? [] : restDays.filter((d) => repeat === 'daily' || days.includes(d)),
       // A one-off task is due today, or keeps its day when edited.
       onceDay: existing?.onceDay ?? forDay,
       // Repeating habits added on a past day count from that day.
@@ -581,6 +585,38 @@ function HabitForm({ existing, forDay }: { existing: Habit | undefined; forDay: 
             )}
           </View>
 
+          {repeat !== 'once' && (
+            <View style={styles.field}>
+              <Text style={styles.label}>Days off</Text>
+              <View style={styles.weekdays}>
+                {WEEKDAYS.map(([wd, letter, full]) => {
+                  const runs = repeat === 'daily' || days.includes(wd);
+                  const on = runs && restDays.includes(wd);
+                  return (
+                    <Pressable
+                      key={wd}
+                      disabled={!runs}
+                      onPress={() =>
+                        setRestDays((prev) => (on ? prev.filter((d) => d !== wd) : [...prev, wd]))
+                      }
+                      style={[styles.weekday, on && styles.weekdayOn, !runs && styles.weekdayOff]}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: on, disabled: !runs }}
+                      accessibilityLabel={`${full} off`}
+                    >
+                      <Text style={[styles.weekdayText, on && styles.weekdayTextOn]}>{letter}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.helper}>
+                {restDays.some((d) => repeat === 'daily' || days.includes(d))
+                  ? 'Skip these days without breaking the streak. Doing it anyway still counts.'
+                  : 'Want a break, like Sundays? Tap a day to rest without losing the streak.'}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.field}>
             <Text style={styles.label}>Time</Text>
             <Segmented options={TIME_OPTIONS} value={timeMode} onChange={setTimeMode} />
@@ -768,6 +804,9 @@ const styles = themedStyles(() => ({
   },
   weekdayTextOn: {
     color: colors.onAccent,
+  },
+  weekdayOff: {
+    opacity: 0.35,
   },
   helper: {
     color: colors.textMuted,
