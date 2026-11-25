@@ -39,12 +39,19 @@ export type Challenge = {
   doneDays: DateKey[];
   // Sprint: when the person left the app, cleared when they come back.
   awaySince?: number;
+  // They left because of a call, so the longer CALL_LIMIT_MS applies instead of the grace.
+  awayCall?: boolean;
   // Why a lost challenge was lost, shown in the history.
   lostReason?: string;
   points: number;
 };
 
 export const LOCK_IN_GRACE_MS = 15_000;
+// The phone can pause Mochi during a call, so it can't always tell when the call ended. Time
+// away for one is excused up to this, so a short call isn't a free pass for the whole sprint.
+export const CALL_LIMIT_MS = 30 * 60_000;
+
+export const awayLimit = (call: boolean | undefined) => (call ? CALL_LIMIT_MS : LOCK_IN_GRACE_MS);
 
 export const IDEAS: ChallengeIdea[] = [
   // Sprints
@@ -306,11 +313,11 @@ export function settle(list: Challenge[], now = Date.now()): Challenge[] {
       }
       return c;
     }
-    if (c.lockIn && c.awaySince && now - c.awaySince > LOCK_IN_GRACE_MS) {
+    if (c.lockIn && c.awaySince && now - c.awaySince > awayLimit(c.awayCall)) {
       return { ...c, status: 'lost', endedAt: now, lostReason: 'Left the app' };
     }
     if (now >= sprintEnd(c)) {
-      return { ...c, status: 'won', endedAt: sprintEnd(c), awaySince: undefined };
+      return { ...c, status: 'won', endedAt: sprintEnd(c), awaySince: undefined, awayCall: undefined };
     }
     return c;
   });

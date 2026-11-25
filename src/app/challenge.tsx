@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -184,6 +184,7 @@ function Accept({
               <Text style={styles.muted}>
                 Leaving the app (or locking the phone) for over 15 seconds loses it. Worth a little
                 more XP. The screen stays on.
+                {Platform.OS === 'web' ? '' : ' Phone calls don’t count as leaving.'}
               </Text>
             </View>
           </Pressable>
