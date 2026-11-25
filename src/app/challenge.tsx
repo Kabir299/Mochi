@@ -294,7 +294,9 @@ function SprintRun({ id }: { id: string }) {
     const ok = await withoutLockIn(() =>
       confirmDestructive(
         'Give up?',
-        `${settings.petName} will be sad, and "${c.title}" goes in your history as lost.`,
+        c.focus
+          ? `${settings.petName} will be sad. No Phone Jail XP, and "${c.title}" stays unticked.`
+          : `${settings.petName} will be sad, and "${c.title}" goes in your history as lost.`,
         'Give up',
       ),
     );
@@ -306,7 +308,9 @@ function SprintRun({ id }: { id: string }) {
   const mood: Mood = c.status === 'won' ? 'ecstatic' : c.status === 'lost' ? 'sad' : 'okay';
   const line =
     c.status === 'won'
-      ? `WE DID IT! ${amountLabel(c)} conquered. +${challengeXp(c)} XP.`
+      ? c.focus
+        ? `WE DID IT! ${amountLabel(c)} of focus, and "${c.title}" is checked in.`
+        : `WE DID IT! ${amountLabel(c)} conquered. +${challengeXp(c)} XP.`
       : c.status === 'lost'
         ? c.lostReason === 'Left the app'
           ? 'You left me… the lock-in broke. Next time we’ll get it.'
@@ -318,7 +322,7 @@ function SprintRun({ id }: { id: string }) {
   return (
     <SafeAreaView style={styles.safe}>
       <ModalHeader
-        title={c.lockIn ? 'Locked in' : 'Challenge'}
+        title={c.focus ? 'Phone Jail' : c.lockIn ? 'Locked in' : 'Challenge'}
         leftLabel={active ? 'Hide' : 'Done'}
       />
       <View style={styles.runContent}>
@@ -355,12 +359,16 @@ function SprintRun({ id }: { id: string }) {
                 color={c.status === 'won' ? colors.streak : colors.textMuted}
               />
               <Text style={styles.resultText}>
-                {c.status === 'won' ? `+${challengeXp(c)} XP` : (c.lostReason ?? 'Lost')}
+                {c.status !== 'won'
+                  ? (c.lostReason ?? 'Lost')
+                  : challengeXp(c) > 0
+                    ? `+${challengeXp(c)} XP`
+                    : 'Served!'}
               </Text>
             </View>
             <Pressable onPress={closeModal} style={styles.primary}>
               <Text style={styles.primaryText}>
-                {c.status === 'won' ? 'Collect and go back' : 'Back'}
+                {c.status !== 'won' ? 'Back' : c.focus ? 'Back to my day' : 'Collect and go back'}
               </Text>
             </Pressable>
           </>

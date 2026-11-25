@@ -29,15 +29,16 @@ export function useChallenges() {
 
   const active = list.filter((c) => c.status === 'active');
   const history = list
-    .filter((c) => c.status !== 'active')
+    .filter((c) => c.status !== 'active' && !c.focus)
     .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0));
 
+  // Focus sessions in Phone Jail aren't challenges, so they stay off the trophy shelf and stats.
   return {
     loaded,
     list,
     active,
     history,
-    stats: statsOf(list),
+    stats: statsOf(list.filter((c) => !c.focus)),
     add: (c: Challenge) => save([...list, c]),
     change,
     remove: (id: string) => save(list.filter((c) => c.id !== id)),

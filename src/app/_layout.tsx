@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppLock } from '@/components/AppLock';
 import { ChallengeWatch } from '@/components/ChallengeWatch';
+import { FocusJailReward } from '@/components/FocusJailReward';
 import { PurchasesSync } from '@/components/PurchasesSync';
 import { ReminderSync } from '@/components/ReminderSync';
 import { WidgetSync } from '@/components/WidgetSync';
@@ -66,6 +67,7 @@ function ThemedScreens() {
         <Stack.Screen name="auth" />
       </Stack>
       <ChallengeWatch />
+      <FocusJailReward />
       <AppLock />
     </Fragment>
   );

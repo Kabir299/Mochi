@@ -44,6 +44,10 @@ export type Challenge = {
   // Why a lost challenge was lost, shown in the history.
   lostReason?: string;
   points: number;
+  // A focus session served in Phone Jail: the task (and day) it ticks off when won.
+  focus?: { habitId: number; day: DateKey };
+  // That task has been ticked off.
+  claimed?: boolean;
 };
 
 export const LOCK_IN_GRACE_MS = 15_000;
@@ -245,6 +249,11 @@ export function pointsFor(kind: ChallengeKind, amount: number, lockIn: boolean) 
   return Math.max(1, Math.round(lockIn ? base * LOCK_IN_BONUS : base));
 }
 
+// Phone Jail from the focus timer pays less than a challenge, since the task it ticks off
+// pays too: 1 XP for every full 12 minutes, so 25 minutes is 2 and an hour is 5.
+export const JAIL_XP_PER_HOUR = 5;
+export const jailXp = (minutes: number) => Math.floor((minutes * JAIL_XP_PER_HOUR) / 60);
+
 export function parseChallenges(raw: string): Challenge[] {
   if (!raw) return [];
   try {
@@ -263,6 +272,7 @@ export function newChallenge(
     minutes?: number;
     days?: number;
     lockIn: boolean;
+    focus?: Challenge['focus'];
   },
   now = Date.now(),
 ): Challenge {
@@ -275,7 +285,9 @@ export function newChallenge(
     startedAt: now,
     startDay: toDateKey(new Date(now)),
     doneDays: [],
-    points: pointsFor(input.kind, amount, input.kind === 'sprint' && input.lockIn),
+    points: input.focus
+      ? jailXp(amount)
+      : pointsFor(input.kind, amount, input.kind === 'sprint' && input.lockIn),
   };
 }
 

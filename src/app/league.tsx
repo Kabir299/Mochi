@@ -18,7 +18,7 @@ import {
   STREAK_DAY_XP,
   TIERS,
 } from '@/lib/league';
-import { RUN_XP_PER_DAY } from '@/lib/challenges';
+import { JAIL_XP_PER_HOUR, RUN_XP_PER_DAY } from '@/lib/challenges';
 import { useLeague } from '@/state/useLeague';
 import { colors, radius, spacing, themedStyles } from '@/theme';
 
@@ -205,6 +205,11 @@ export default function LeagueScreen() {
             icon="timer-outline"
             label="Sprint: 1 h locked in / 2 h locked in"
             text="12 / 28"
+          />
+          <XpLine
+            icon="phone-portrait-outline"
+            label="Focus in Phone Jail, per hour"
+            xp={JAIL_XP_PER_HOUR}
           />
           <XpLine icon="calendar-outline" label="Finish a run, per day in it" xp={RUN_XP_PER_DAY} />
           <Text style={styles.muted}>

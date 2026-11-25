@@ -1,4 +1,4 @@
-import { Challenge, pointsFor } from '@/lib/challenges';
+import { Challenge, jailXp, pointsFor } from '@/lib/challenges';
 import { addDays, DateKey, fromDateKey, toDateKey } from '@/lib/dates';
 import type { Habit } from '@/state/habits';
 
@@ -19,8 +19,10 @@ export const DAILY_HABIT_CAP = 150;
 // can't farm the league; finishing a run is never capped.
 export const DAILY_CHALLENGE_CAP = 60;
 
-export const challengeXp = (c: Pick<Challenge, 'kind' | 'minutes' | 'days' | 'lockIn'>) =>
-  pointsFor(c.kind, (c.kind === 'sprint' ? c.minutes : c.days) ?? 1, c.lockIn);
+export const challengeXp = (c: Pick<Challenge, 'kind' | 'minutes' | 'days' | 'lockIn' | 'focus'>) =>
+  c.focus
+    ? jailXp(c.minutes ?? 0)
+    : pointsFor(c.kind, (c.kind === 'sprint' ? c.minutes : c.days) ?? 1, c.lockIn);
 
 export type XpSource = {
   allHabits: Habit[];

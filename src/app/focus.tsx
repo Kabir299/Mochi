@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, Text, TextInput, View } from 'react-native';
+import { Animated, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ModalHeader } from '@/components/ModalHeader';
 import { Pet } from '@/components/Pet';
+import { jailXp, newChallenge } from '@/lib/challenges';
 import { formatDuration } from '@/lib/dates';
 import type { Mood } from '@/lib/encouragement';
 import { closeModal } from '@/lib/nav';
-import { cancelFocusEnd, scheduleFocusEnd } from '@/lib/reminders';
+import { cancelFocusEnd, scheduleChallengeNotice, scheduleFocusEnd } from '@/lib/reminders';
 import { useHabits } from '@/state/habits';
 import { useSettings } from '@/state/settings';
+import { useChallenges } from '@/state/useChallenges';
 import { colors, radius, spacing, themedStyles } from '@/theme';
 
 const LENGTHS = [15, 25, 45, 60];
@@ -60,6 +62,7 @@ export default function FocusScreen() {
 function FocusTimer({ habitId, day }: { habitId: number; day: string }) {
   const { getHabit, checkIn, countFor, addFocusTime } = useHabits();
   const settings = useSettings();
+  const { active, add } = useChallenges();
   const habit = getHabit(habitId)!;
   const endNotice = useRef<string | null>(null);
   const [breathe] = useState(() => new Animated.Value(1));
@@ -69,6 +72,7 @@ function FocusTimer({ habitId, day }: { habitId: number; day: string }) {
   // Only read while running, and set when the timer starts.
   const [now, setNow] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [jail, setJail] = useState(false);
   // Typed minutes; shown when the habit's own length isn't a preset, or after tapping Custom.
   const [custom, setCustom] = useState<string | null>(() =>
     LENGTHS.includes(lengthMin) ? null : String(lengthMin),
@@ -144,6 +148,31 @@ function FocusTimer({ habitId, day }: { habitId: number; day: string }) {
     },
     [],
   );
+
+  // Only one lock-in is watched at a time.
+  const lockedIn = active.some((c) => c.kind === 'sprint' && c.lockIn);
+  const inJail = jail && !lockedIn;
+  const xp = jailXp(lengthMin);
+
+  // Runs as a lock-in sprint, so leaving the app is watched; FocusJailReward ticks the task.
+  const enterJail = async () => {
+    const c = newChallenge({
+      kind: 'sprint',
+      title: habit.name,
+      icon: habit.icon,
+      minutes: lengthMin,
+      lockIn: true,
+      focus: { habitId, day },
+    });
+    await add(c);
+    scheduleChallengeNotice(
+      'end',
+      lengthMin * 60,
+      `${habit.name} done!`,
+      `${settings.petName}: You served your time!${xp > 0 ? ` +${xp} XP.` : ''}`,
+    ).catch(() => {});
+    router.replace({ pathname: '/challenge', params: { id: c.id } });
+  };
 
   const toggle = async () => {
     if (running) {
@@ -250,24 +279,63 @@ function FocusTimer({ habitId, day }: { habitId: number; day: string }) {
                 <Text style={styles.chipText}>minutes (up to {MAX_LENGTH})</Text>
               </View>
             )}
+            {!running && elapsedMs === 0 && (
+              <Pressable
+                onPress={() => setJail(!jail)}
+                disabled={lockedIn}
+                style={[styles.jailCard, inJail && styles.jailCardOn]}
+                accessibilityRole="switch"
+                accessibilityLabel="Phone Jail"
+                accessibilityState={{ checked: inJail, disabled: lockedIn }}
+              >
+                <Ionicons
+                  name={inJail ? 'lock-closed' : 'lock-open-outline'}
+                  size={22}
+                  color={inJail ? colors.streak : colors.textMuted}
+                />
+                <View style={styles.flex}>
+                  <Text style={styles.jailTitle}>
+                    Phone Jail {inJail ? 'on' : 'off'}
+                    {xp > 0 ? ` · +${xp} XP` : ''}
+                  </Text>
+                  <Text style={styles.jailText}>
+                    {lockedIn
+                      ? 'You’re already locked in. Finish that one first.'
+                      : `Stay in Mochi until time’s up. Leaving for over 15 seconds ends it, and there’s no pausing.${
+                          Platform.OS === 'web' ? '' : ' Phone calls don’t count.'
+                        }`}
+                  </Text>
+                </View>
+              </Pressable>
+            )}
+            {!inJail && (
+              <Pressable
+                onPress={() => settings.update({ focusKeepAwake: !settings.focusKeepAwake })}
+                style={styles.tickRow}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: settings.focusKeepAwake }}
+                hitSlop={8}
+              >
+                <Ionicons
+                  name={settings.focusKeepAwake ? 'checkbox' : 'square-outline'}
+                  size={20}
+                  color={settings.focusKeepAwake ? colors.accent : colors.textMuted}
+                />
+                <Text style={styles.chipText}>Keep screen on</Text>
+              </Pressable>
+            )}
             <Pressable
-              onPress={() => settings.update({ focusKeepAwake: !settings.focusKeepAwake })}
-              style={styles.tickRow}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: settings.focusKeepAwake }}
-              hitSlop={8}
+              onPress={inJail ? enterJail : toggle}
+              style={styles.primary}
+              accessibilityRole="button"
             >
               <Ionicons
-                name={settings.focusKeepAwake ? 'checkbox' : 'square-outline'}
+                name={running ? 'pause' : inJail && elapsedMs === 0 ? 'lock-closed' : 'play'}
                 size={20}
-                color={settings.focusKeepAwake ? colors.accent : colors.textMuted}
+                color={colors.onAccent}
               />
-              <Text style={styles.chipText}>Keep screen on</Text>
-            </Pressable>
-            <Pressable onPress={toggle} style={styles.primary} accessibilityRole="button">
-              <Ionicons name={running ? 'pause' : 'play'} size={20} color={colors.onAccent} />
               <Text style={styles.primaryText}>
-                {running ? 'Pause' : elapsedMs > 0 ? 'Resume' : 'Start'}
+                {running ? 'Pause' : elapsedMs > 0 ? 'Resume' : inJail ? 'Lock me in' : 'Start'}
               </Text>
             </Pressable>
             {elapsedMs > 0 && (
@@ -316,6 +384,31 @@ const styles = themedStyles(() => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  flex: { flex: 1 },
+  jailCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    alignSelf: 'stretch',
+    backgroundColor: colors.card,
+    borderRadius: radius.card,
+    padding: spacing.md,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  jailCardOn: {
+    borderColor: colors.streak,
+  },
+  jailTitle: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  jailText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
   },
   titleRow: {
     flexDirection: 'row',
