@@ -107,7 +107,12 @@ export function ChallengeWatch() {
           cancelChallengeNotice('warn').catch(() => {});
           latest.current.change(cur.id, { awaySince: start, awayCall: true });
         }
-        if (forCall()) return;
+        if (forCall()) {
+          // Seen on the call just now, so a long one isn't held against them.
+          awayCall.current = true;
+          awayAt.current = Date.now();
+          return;
+        }
       }
       if (tooLong(start)) {
         lose(cur);

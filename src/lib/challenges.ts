@@ -48,8 +48,8 @@ export type Challenge = {
 
 export const LOCK_IN_GRACE_MS = 15_000;
 // The phone can pause Mochi during a call, so it can't always tell when the call ended. Time
-// away for one is excused up to this, so a short call isn't a free pass for the whole sprint.
-export const CALL_LIMIT_MS = 30 * 60_000;
+// away since the call was last seen is excused up to this, so a short call isn't a free pass.
+export const CALL_LIMIT_MS = 5 * 60_000;
 
 export const awayLimit = (call: boolean | undefined) => (call ? CALL_LIMIT_MS : LOCK_IN_GRACE_MS);
 
