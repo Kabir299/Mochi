@@ -1,0 +1,38 @@
+diff --git a/node_modules/expo-widgets/android/src/main/java/expo/modules/widgets/ExpoWidgetEmittableTree.kt b/node_modules/expo-widgets/android/src/main/java/expo/modules/widgets/ExpoWidgetEmittableTree.kt
+index 3df9e4a..c35bb27 100644
+--- a/node_modules/expo-widgets/android/src/main/java/expo/modules/widgets/ExpoWidgetEmittableTree.kt
++++ b/node_modules/expo-widgets/android/src/main/java/expo/modules/widgets/ExpoWidgetEmittableTree.kt
+@@ -66,6 +66,7 @@ import androidx.glance.ImageProvider
+ import androidx.glance.TintColorFilterParams
+ import androidx.glance.GlanceModifier
+ import androidx.glance.action.clickable
++import androidx.glance.appwidget.action.actionStartActivity
+ import androidx.glance.appwidget.CheckboxDefaults
+ import androidx.glance.appwidget.cornerRadius
+ import androidx.glance.appwidget.EmittableCheckBox
+@@ -123,6 +124,12 @@ private class WidgetConverterContext(
+ internal fun ReadableMap.toPeekRoot(context: Context, source: InteractionSource, size: DpSize): Emittable {
+   val converterContext = WidgetConverterContext(context, size)
+   return EmittableColumn().also { root ->
++    // Mochi: tapping anywhere on a home-screen widget opens the app.
++    if (source is InteractionSource.Widget) {
++      context.packageManager.getLaunchIntentForPackage(context.packageName)?.let { intent ->
++        root.modifier = GlanceModifier.fillMaxSize().clickable(actionStartActivity(intent))
++      }
++    }
+     root.children += toPeekNodes(converterContext, source)
+   }
+ }
+diff --git a/node_modules/expo-widgets/plugin/build/android/withAndroidWidgetFiles.js b/node_modules/expo-widgets/plugin/build/android/withAndroidWidgetFiles.js
+index 0fcc4a9..ed2eacf 100644
+--- a/node_modules/expo-widgets/plugin/build/android/withAndroidWidgetFiles.js
++++ b/node_modules/expo-widgets/plugin/build/android/withAndroidWidgetFiles.js
+@@ -152,7 +152,7 @@ const createWidgetInfoXml = (widget)=>{
+   android:minHeight="${android.minHeight}dp"
+   android:targetCellWidth="${android.targetCellWidth}"
+   android:targetCellHeight="${android.targetCellHeight}"
+-  android:updatePeriodMillis="0"
++  android:updatePeriodMillis="1800000"
+   android:initialLayout="@layout/expo_widgets_initial_layout"
+   android:description="@string/${(0, _resourceNames.getWidgetDescriptionResourceName)(widget)}"
+   android:resizeMode="${getWidgetResizeMode(widget)}"

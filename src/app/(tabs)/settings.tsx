@@ -311,6 +311,13 @@ export default function SettingsScreen() {
               onChange={toggleLock}
             />
           )}
+          {Platform.OS !== 'web' && (
+            <ToggleRow
+              label="Show task names on the widget"
+              value={settings.widgetNames}
+              onChange={(on) => settings.update({ widgetNames: on })}
+            />
+          )}
           {PRIVACY_URL && (
             <LinkRow
               icon="shield-checkmark-outline"

@@ -40,6 +40,8 @@ export type Settings = {
   profile: string;
   // Ask for fingerprint / Face ID / passcode when the app opens.
   appLock: boolean;
+  // The home-screen widget may show task names (off: only how many are left).
+  widgetNames: boolean;
   // The Nutrition tab asked for a body goal (answered or "Not now").
   bodyGoalAsked: boolean;
   // Missed days brought back by finishing the next day at 100%, comma separated.
@@ -48,7 +50,7 @@ export type Settings = {
   repairPending: string;
   // The last missed day whose card was answered or dismissed, so it shows once.
   dayCheckSeen: string;
-  // Pro: weekdays (0 = Sunday, comma separated) where skipping keeps the streak.
+  // Weekdays (0 = Sunday, comma separated) where skipping keeps every streak.
   restDays: string;
   // Focus timer keeps the screen awake while it runs.
   focusKeepAwake: boolean;
@@ -93,11 +95,13 @@ const DEFAULTS: Settings = {
   onboarded: false,
   profile: '',
   appLock: true,
+  widgetNames: false,
   bodyGoalAsked: false,
   repairedDays: '',
   repairPending: '',
   dayCheckSeen: '',
-  restDays: '',
+  // Sunday off has always been the default, so past Sundays must stay protected.
+  restDays: '0',
   focusKeepAwake: false,
   guideSeen: false,
   nutritionGuideSeen: false,
@@ -151,6 +155,7 @@ function parse(raw: Record<string, string>): Settings {
     onboarded: raw.onboarded === '1',
     // On unless the person turned it off.
     appLock: raw.appLock !== '0',
+    widgetNames: raw.widgetNames === '1',
     bodyGoalAsked: raw.bodyGoalAsked === '1',
     repairedDays: raw.repairedDays ?? '',
     repairPending: raw.repairPending ?? '',

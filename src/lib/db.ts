@@ -435,7 +435,7 @@ const BACKUP_TABLES = [
 
 // Belong to this phone, not the person: Pro comes from the store account, the lock
 // and reminders need this phone's own permission.
-const DEVICE_SETTINGS = new Set(['isPro', 'appLock', 'remindersOn']);
+const DEVICE_SETTINGS = new Set(['isPro', 'appLock', 'remindersOn', 'widgetNames']);
 
 const isRow = (row: unknown): row is Row =>
   typeof row === 'object' &&

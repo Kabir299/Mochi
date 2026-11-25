@@ -80,7 +80,7 @@ Where the habit tracker stands and what's left, roughly in order. Last updated 2
 
 ### 4. Development build
 - [ ] Switch from Expo Go to a development build (`eas build --profile development`)
-- [ ] Home-screen widget: today's % and the next task (needs the development build)
+- [x] Home-screen widget: today's %, streak and the next task (`src/widgets`)
 - [ ] Block distracting apps during focus mode, choosing which apps when starting a session
       - iPhone: Screen Time API (FamilyControls / ManagedSettings); Apple must approve the
         Family Controls entitlement for the developer account first

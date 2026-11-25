@@ -10,6 +10,7 @@ import { AppLock } from '@/components/AppLock';
 import { ChallengeWatch } from '@/components/ChallengeWatch';
 import { PurchasesSync } from '@/components/PurchasesSync';
 import { ReminderSync } from '@/components/ReminderSync';
+import { WidgetSync } from '@/components/WidgetSync';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/lib/db';
 import { ensureLocalTables, saveDailySnapshot } from '@/lib/snapshots';
 import { applyKey, DbChoice, prepareDatabase } from '@/lib/secureDb';
@@ -103,6 +104,7 @@ export default function RootLayout() {
           <HabitsProvider>
             <NutritionProvider>
               <ReminderSync />
+              <WidgetSync />
               <PurchasesSync />
               <AccountProvider>
                 <BuddySyncProvider>

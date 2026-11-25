@@ -72,6 +72,12 @@ and your store purchase receipts. It is not linked to your name or email.
 App lock is on by default on phones with a screen lock, and you can turn it off in Settings. Your phone checks your fingerprint, face or PIN itself. The app only
 learns "unlocked" or "not unlocked" and never sees or stores the biometric data.
 
+## Home-screen widget
+
+If you add the widget, your phone keeps today's %, your streak and how many tasks are left outside
+the encrypted database so the widget can show them. Task names appear only if you turn that on in
+Settings. The widget stays visible while the app is locked.
+
 ## Notifications
 
 Reminders are scheduled on your phone. Nothing about them is sent to us.
