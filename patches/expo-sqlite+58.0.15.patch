@@ -1,0 +1,51 @@
+diff --git a/node_modules/expo-sqlite/web/SQLiteModule.ts b/node_modules/expo-sqlite/web/SQLiteModule.ts
+index 7fe4903..b244965 100644
+--- a/node_modules/expo-sqlite/web/SQLiteModule.ts
++++ b/node_modules/expo-sqlite/web/SQLiteModule.ts
+@@ -32,6 +32,12 @@ function getWorker(): Worker {
+       }
+       workerMessageHandler(event);
+     });
++    // Let go of the database as soon as the page is left, so the next page can open it. A page
++    // brought back from the browser's back/forward cache has no worker any more, so reload it.
++    window.addEventListener('pagehide', () => worker?.terminate());
++    window.addEventListener('pageshow', (event) => {
++      if (event.persisted) window.location.reload();
++    });
+     worker.postMessage({ type: 'configure', data: webOptions } satisfies ConfigureWorkerMessage);
+   }
+   return worker;
+diff --git a/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js b/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
+index 3f9f133..4a1569a 100644
+--- a/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
++++ b/node_modules/expo-sqlite/web/wa-sqlite/AccessHandlePoolVFS.js
+@@ -24,6 +24,20 @@ const PERSISTENT_FILE_TYPES =
+ 
+ const DEFAULT_CAPACITY = 6;
+ 
++// A page that was just left can hold the files for a moment, so wait for it to let go.
++const ACQUIRE_TIMEOUT_MS = 10000;
++async function openAccessHandle(handle) {
++  const giveUpAt = Date.now() + ACQUIRE_TIMEOUT_MS;
++  while (true) {
++    try {
++      return await handle.createSyncAccessHandle();
++    } catch (e) {
++      if (Date.now() > giveUpAt) throw e;
++      await new Promise((resolve) => setTimeout(resolve, 150));
++    }
++  }
++}
++
+ /**
+  * This VFS uses the updated Access Handle API with all synchronous methods
+  * on FileSystemSyncAccessHandle (instead of just read and write). It will
+@@ -306,7 +320,7 @@ export class AccessHandlePoolVFS extends FacadeVFS {
+     // Open access handles in parallel, separating associated and unassociated.
+     await Promise.all(
+       files.map(async ([name, handle]) => {
+-        const accessHandle = await handle.createSyncAccessHandle();
++        const accessHandle = await openAccessHandle(handle);
+         this.#mapAccessHandleToName.set(accessHandle, name);
+         const path = this.#getAssociatedPath(accessHandle);
+         if (path) {

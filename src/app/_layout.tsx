@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
-import { useColorScheme } from 'react-native';
-import { Stack } from 'expo-router';
+import { Platform, Pressable, Text, useColorScheme, View } from 'react-native';
+import { ErrorBoundary as RouterError, ErrorBoundaryProps, Stack } from 'expo-router';
 import { SQLiteDatabase, SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
@@ -70,6 +70,32 @@ function ThemedScreens() {
       <FocusJailReward />
       <AppLock />
     </Fragment>
+  );
+}
+
+// On the web only one tab can hold the database. Says so instead of leaving a blank page.
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  if (Platform.OS !== 'web' || !/access handle/i.test(props.error.message)) {
+    return <RouterError {...props} />;
+  }
+  return (
+    <View
+      style={{
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 16,
+        padding: 32,
+        backgroundColor: colors.background,
+      }}
+    >
+      <Text style={{ color: colors.text, fontSize: 16, textAlign: 'center' }}>
+        Mochi is already open in another tab or window. Close that one, then try again.
+      </Text>
+      <Pressable onPress={() => window.location.reload()} accessibilityRole="button">
+        <Text style={{ color: colors.accent, fontSize: 16, fontWeight: '600' }}>Try again</Text>
+      </Pressable>
+    </View>
   );
 }
 
